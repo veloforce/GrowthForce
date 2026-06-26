@@ -526,6 +526,73 @@ test("workbench navigation always opens a new conversation", async ({ page }) =>
   ]);
 });
 
+test("renderer keeps locked workspace picker aligned with dark picker surfaces", async ({ page }) => {
+  await page.addInitScript(({ completeConfig, mockPaths }) => {
+    const historySession = {
+      id: 81,
+      title: "暗色历史会话",
+      workspacePath: "/tmp/agentstudio-test/history",
+      status: "completed",
+      createdAt: "2026-06-26T00:00:00.000Z",
+      updatedAt: "2026-06-26T00:00:00.000Z"
+    };
+    const settings = {
+      chat: { permissionMode: "auto" },
+      ui: { themeMode: "dark" },
+      connector: { xhs: { selected_account: "" }, wechat: { selected_account: "" } },
+      workspace: { recentDirectories: [mockPaths.workspace] },
+      skills: { installed: {}, disabled: [] }
+    };
+    // @ts-ignore Browser smoke test provides the Electron preload surface.
+    window.agentStudio = {
+      bootstrap: async () => ({
+        paths: mockPaths,
+        config: completeConfig,
+        needsOnboarding: false,
+        modelProviderSettings: { providers: [] },
+        imageProviderSettings: { imageProviders: [] },
+        settings,
+        theme: { themeMode: "dark", resolvedTheme: "dark" },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [] },
+        workspace: { currentPath: mockPaths.workspace, defaultPath: mockPaths.workspace, recentDirectories: [mockPaths.workspace] },
+        sessions: [historySession]
+      }),
+      listSessions: async () => [historySession],
+      getSession: async () => ({
+        session: historySession,
+        messages: [{ id: "history-message", kind: "text", role: "user", text: "历史消息内容" }]
+      }),
+      getConnectorState: async () => ({ accounts: [], selected: { xhs: "", wechat: "" }, locked: { xhs: {} } }),
+      updateBrowserSurface: async () => null,
+      onAutomationChanged: () => () => undefined,
+      onAgentEvent: () => () => undefined
+    };
+  }, { completeConfig, mockPaths });
+
+  await page.goto("/");
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+  await page.locator(".sessionItem", { hasText: "暗色历史会话" }).click();
+  await expect(page.locator(".workspacePicker")).toBeDisabled();
+  await expect(page.locator(".workspacePicker")).toHaveText("history");
+
+  const pickerStyle = async (selector: string) => page.locator(selector).evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, opacity: style.opacity, shadow: style.boxShadow };
+  });
+  const workspaceStyle = await pickerStyle(".workspacePicker");
+  const connectorStyle = await pickerStyle(".connectorPicker");
+  const permissionStyle = await pickerStyle(".permissionPicker");
+  expect(workspaceStyle).toEqual(connectorStyle);
+  expect(workspaceStyle).toEqual(permissionStyle);
+  expect(workspaceStyle.opacity).toBe("1");
+  expect(workspaceStyle.background).not.toBe("rgba(246, 248, 252, 0.96)");
+
+  await page.locator(".workspacePicker").hover();
+  await expect.poll(() => pickerStyle(".workspacePicker").then((style) => style.background)).toBe(workspaceStyle.background);
+  await page.locator(".workspacePicker").click({ force: true });
+  await expect(page.locator(".workspaceMenu")).toHaveCount(0);
+});
+
 test("renderer keeps browser surface offscreen until user opens right panel", async ({ page }) => {
   await page.addInitScript(({ completeConfig, mockPaths }) => {
     const session = {
