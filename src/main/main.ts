@@ -200,12 +200,22 @@ function readWorkbenchPrompts(): WorkbenchPrompts {
   const fallback: WorkbenchPrompts = {
     typingPrompts: ["我是小G"],
     quickPrompts: [
-      "帮我分析当前项目结构并给出改进建议",
-      "总结这个目录下最近的关键文件",
-      "生成一份本地项目执行计划",
-      "检查 README 和配置是否一致",
-      "帮我创建一个可执行的任务清单",
-      "优化这段文案的表达"
+      {
+        title: "热点选题",
+        prompt: "帮我围绕当前账号定位和目标用户，调研近期适合做内容的热点与竞品方向，输出 5-10 个候选选题、推荐理由、风险提醒，并把最推荐的选题整理成可直接创作的 Content Brief。"
+      },
+      {
+        title: "小红书笔记",
+        prompt: "帮我围绕一个适合当前账号的小红书主题生成发布包：包含 3-5 个标题备选、正文、标签、封面/配图建议、互动引导和发布后应关注的数据指标。如果主题不明确，请先给我 3 个可选方向。"
+      },
+      {
+        title: "内容复盘",
+        prompt: "帮我复盘近期已发布内容的表现：读取可用的发布记录和指标，区分事实、解释和建议，找出表现好的内容模式、需要调整的问题，以及下一轮选题和创作的优先改进动作。"
+      },
+      {
+        title: "账号诊断",
+        prompt: "帮我诊断当前内容账号：从账号定位、目标用户、选题方向、内容结构、互动引导和数据短板几个维度分析现状，给出优先级最高的 3-5 个改进动作和下一步内容运营建议。"
+      }
     ]
   };
   const candidates = [
@@ -219,7 +229,7 @@ function readWorkbenchPrompts(): WorkbenchPrompts {
     try {
       const parsed = JSON.parse(fs.readFileSync(candidate, "utf8")) as Partial<WorkbenchPrompts>;
       const typingPrompts = normalizePromptList(parsed.typingPrompts);
-      const quickPrompts = normalizePromptList(parsed.quickPrompts);
+      const quickPrompts = normalizeQuickPromptList(parsed.quickPrompts);
       return {
         typingPrompts: typingPrompts.length > 0 ? typingPrompts : fallback.typingPrompts,
         quickPrompts: quickPrompts.length > 0 ? quickPrompts : fallback.quickPrompts
@@ -235,6 +245,21 @@ function readWorkbenchPrompts(): WorkbenchPrompts {
 function normalizePromptList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return Array.from(new Set(value.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim())));
+}
+
+function normalizeQuickPromptList(value: unknown): WorkbenchPrompts["quickPrompts"] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const prompts: WorkbenchPrompts["quickPrompts"] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const title = "title" in item && typeof item.title === "string" ? item.title.trim() : "";
+    const prompt = "prompt" in item && typeof item.prompt === "string" ? item.prompt.trim() : "";
+    if (!title || !prompt || seen.has(title)) continue;
+    seen.add(title);
+    prompts.push({ title, prompt });
+  }
+  return prompts;
 }
 
 function registerIpc(): void {
@@ -1003,6 +1028,7 @@ function registerIpc(): void {
     if (!prompt) throw new Error("请输入内容");
 
     const config = readConfig();
+    assertModelProviderConfigured(config);
     const permissionMode = normalizePermissionMode(input.permissionMode);
     const attachments = normalizeAttachments(input.attachments);
     const selectedSkills = normalizeSelectedSkills(input.selectedSkills);
@@ -1624,6 +1650,11 @@ function sessionRuntimeCacheHasActiveRequest(): boolean {
     if (runtime.requestId) return true;
   }
   return false;
+}
+
+function assertModelProviderConfigured(config: ReturnType<typeof readConfig>): void {
+  if (!needsProviderOnboarding(config)) return;
+  throw new Error("请先配置模型供应商：请完整填写 Base URL、API Key 和 Model 后再提交。");
 }
 
 function normalizeProviderConfig(value: ModelProviderConfig): ModelProviderConfig {

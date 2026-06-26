@@ -54,7 +54,7 @@ import douyinLogoUrl from "./assets/connectors/dy.png";
 import gzhLogoUrl from "./assets/connectors/gzh.png";
 import xhsLogoUrl from "./assets/connectors/xhs.png";
 import { formatAutomationSchedule, formatAutomationStatus } from "@shared/automation";
-import type { AgentEvent, AgentPermissionRequest, AgentPermissionResponse, AgentStudioConfig, AgentStudioSettings, AgentSupplementQueueItem, ArtifactFileKind, ArtifactFilePreview, AutomationRun, AutomationScheduleConfig, AutomationScheduleType, AutomationTask, AutomationTaskInput, ChatPermissionMode, ImageProviderDefinition, ImageProviderSettings, ImageProviderType, LocalAttachment, MarketSkillItem, ModelProviderConfig, ModelProviderDefinition, ModelProviderSettings, PromptSkillReference, RuntimePaths, SessionDetail, SessionRecord, SkillContent, SkillListItem, StoredChatMessage, StoredSupplementMessage, StoredTextMessage, StoredToolCall, ThemeMode, ThemeState, WorkbenchPrompts, WorkspaceState } from "@shared/types";
+import type { AgentEvent, AgentPermissionRequest, AgentPermissionResponse, AgentStudioConfig, AgentStudioSettings, AgentSupplementQueueItem, ArtifactFileKind, ArtifactFilePreview, AutomationRun, AutomationScheduleConfig, AutomationScheduleType, AutomationTask, AutomationTaskInput, ChatPermissionMode, ImageProviderDefinition, ImageProviderSettings, ImageProviderType, LocalAttachment, MarketSkillItem, ModelProviderConfig, ModelProviderDefinition, ModelProviderSettings, PromptSkillReference, RuntimePaths, SessionDetail, SessionRecord, SkillContent, SkillListItem, StoredChatMessage, StoredSupplementMessage, StoredTextMessage, StoredToolCall, ThemeMode, ThemeState, WorkbenchPrompts, WorkbenchQuickPrompt, WorkspaceState } from "@shared/types";
 import type { ConnectorAccount, ConnectorState } from "@shared/types";
 
 type ChatMessage = StoredChatMessage;
@@ -69,6 +69,7 @@ type ComposerPopover = "add" | "connector" | "workspace" | "permission" | "model
 type PreviewMode = "rendered" | "source";
 type WechatAccountDraft = { displayName: string; appId: string; secret: string };
 type PermissionDraft = { answers: Record<string, string | string[]>; freeform: Record<string, string>; response: string; mode: AgentPermissionResponse["mode"]; message: string };
+type SettingsDialogInitialView = { section: SettingsSection; providerTab: ProviderSettingsTab };
 
 interface ArtifactFileCard {
   path: string;
@@ -100,12 +101,22 @@ interface BootstrapState {
 const fallbackWorkbenchPrompts: WorkbenchPrompts = {
   typingPrompts: ["我是小G"],
   quickPrompts: [
-    "帮我分析当前项目结构并给出改进建议",
-    "总结这个目录下最近的关键文件",
-    "生成一份本地项目执行计划",
-    "检查 README 和配置是否一致",
-    "帮我创建一个可执行的任务清单",
-    "优化这段文案的表达"
+    {
+      title: "热点选题",
+      prompt: "帮我围绕当前账号定位和目标用户，调研近期适合做内容的热点与竞品方向，输出 5-10 个候选选题、推荐理由、风险提醒，并把最推荐的选题整理成可直接创作的 Content Brief。"
+    },
+    {
+      title: "小红书笔记",
+      prompt: "帮我围绕一个适合当前账号的小红书主题生成发布包：包含 3-5 个标题备选、正文、标签、封面/配图建议、互动引导和发布后应关注的数据指标。如果主题不明确，请先给我 3 个可选方向。"
+    },
+    {
+      title: "内容复盘",
+      prompt: "帮我复盘近期已发布内容的表现：读取可用的发布记录和指标，区分事实、解释和建议，找出表现好的内容模式、需要调整的问题，以及下一轮选题和创作的优先改进动作。"
+    },
+    {
+      title: "账号诊断",
+      prompt: "帮我诊断当前内容账号：从账号定位、目标用户、选题方向、内容结构、互动引导和数据短板几个维度分析现状，给出优先级最高的 3-5 个改进动作和下一步内容运营建议。"
+    }
   ]
 };
 
@@ -149,6 +160,7 @@ const visibleSkillAgent = "orchestrator";
 const emptyProviderDraft: ModelProviderConfig = { id: "", baseUrl: "", apiKey: "", model: "" };
 const emptyModelProviderSettings: ModelProviderSettings = { providers: [] };
 const emptyImageProviderSettings: ImageProviderSettings = { imageProviders: [] };
+const missingModelProviderMessage = "请完整填写 Base URL、API Key 和 Model 后再提交。";
 const imageProviderDefaults: Record<ImageProviderType, { label: string; name: string; baseUrl: string; model: string }> = {
   doubao: {
     label: "豆包 Seedream",
@@ -228,6 +240,7 @@ export function App() {
   const [providerSaving, setProviderSaving] = useState(false);
   const [providerError, setProviderError] = useState("");
   const [settingsDialogOpen, setSettingsDialogOpen] = useState(false);
+  const [settingsDialogInitialView, setSettingsDialogInitialView] = useState<SettingsDialogInitialView>({ section: "providers", providerTab: "model" });
   const [modelProviderSettings, setModelProviderSettings] = useState<ModelProviderSettings>(emptyModelProviderSettings);
   const [imageProviderSettings, setImageProviderSettings] = useState<ImageProviderSettings>(emptyImageProviderSettings);
   const [selectedProviderId, setSelectedProviderId] = useState("");
@@ -296,11 +309,12 @@ export function App() {
   const [artifactPreviewLoading, setArtifactPreviewLoading] = useState(false);
   const [artifactPreviewLoadingPath, setArtifactPreviewLoadingPath] = useState<string | null>(null);
   const [artifactPreviewError, setArtifactPreviewError] = useState("");
-  const [emptyQuickPrompts, setEmptyQuickPrompts] = useState<string[]>(fallbackWorkbenchPrompts.quickPrompts.slice(0, 6));
+  const [emptyQuickPrompts, setEmptyQuickPrompts] = useState<WorkbenchQuickPrompt[]>(fallbackWorkbenchPrompts.quickPrompts.slice(0, 4));
   const [typedPrompt, setTypedPrompt] = useState("");
   const [typingIndex, setTypingIndex] = useState(0);
   const [typingDeleting, setTypingDeleting] = useState(false);
   const chatAreaRef = useRef<HTMLDivElement | null>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const browserSurfaceRef = useRef<HTMLDivElement | null>(null);
   const composerMenuRef = useRef<HTMLDivElement | null>(null);
   const connectorMenuRef = useRef<HTMLDivElement | null>(null);
@@ -429,7 +443,7 @@ export function App() {
       }
       void refreshConnectorState();
       setOnboardingVisible(Boolean(data.needsOnboarding));
-      setEmptyQuickPrompts(pickRandomPrompts(data.workbenchPrompts?.quickPrompts ?? fallbackWorkbenchPrompts.quickPrompts, 6));
+      setEmptyQuickPrompts(pickRandomPrompts(data.workbenchPrompts?.quickPrompts ?? fallbackWorkbenchPrompts.quickPrompts, 4));
     });
   }, []);
 
@@ -1019,8 +1033,17 @@ export function App() {
     clearMockThinking();
     setAttachments([]);
     setSelectedPromptSkills([]);
-    setEmptyQuickPrompts(pickRandomPrompts(workbenchPrompts.quickPrompts, 6));
+    setEmptyQuickPrompts(pickRandomPrompts(workbenchPrompts.quickPrompts, 4));
     setError("");
+  }
+
+  function insertQuickPrompt(prompt: WorkbenchQuickPrompt) {
+    setInput(prompt.prompt);
+    window.requestAnimationFrame(() => {
+      composerTextareaRef.current?.focus();
+      const cursor = prompt.prompt.length;
+      composerTextareaRef.current?.setSelectionRange(cursor, cursor);
+    });
   }
 
   function openWorkbench() {
@@ -1281,6 +1304,10 @@ export function App() {
       return;
     }
     if (activeSessionId && runningRequests[activeSessionId]) return;
+    if (needsModelProviderSetup(bootstrap?.config)) {
+      await openModelProviderSettingsForMissingConfig();
+      return;
+    }
     setError("");
     clearMockThinking();
     const optimisticMessageId = crypto.randomUUID();
@@ -1305,6 +1332,13 @@ export function App() {
       setAttachments(turnAttachments);
       setSelectedPromptSkills(turnSkills);
       const message = err instanceof Error ? err.message : String(err);
+      if (isMissingModelProviderError(message)) {
+        setInput(prompt);
+        setMessages((prev) => prev.filter((item) => item.id !== optimisticMessageId));
+        await openModelProviderSettingsForMissingConfig();
+        await refreshSessions();
+        return;
+      }
       setError(message);
       clearMockThinking();
       setMessages((prev) => appendMessage(prev.filter((item) => item.id !== optimisticMessageId), { id: crypto.randomUUID(), kind: "text", role: "system", text: message }));
@@ -1465,9 +1499,37 @@ export function App() {
   }
 
   async function openSettingsDialog() {
+    setSettingsDialogInitialView({ section: "providers", providerTab: "model" });
     setSettingsDialogOpen(true);
     try {
       await refreshProviderSettings();
+    } catch (err) {
+      setModelSettingsError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function openModelProviderSettingsForMissingConfig() {
+    setError("");
+    setModelSettingsError(missingModelProviderMessage);
+    setSettingsDialogInitialView({ section: "providers", providerTab: "model" });
+    setSettingsDialogOpen(true);
+    closeComposerPopover();
+    if (!window.agentStudio) return;
+    try {
+      const modelResult = await window.agentStudio.getModelProviderSettings() as { settings: ModelProviderSettings; config: AgentStudioConfig };
+      const settings = ensureEditableModelProviderSettings(modelResult.settings);
+      setModelProviderSettings(settings);
+      setSelectedProviderId(resolveSelectedProviderId(settings, modelResult.config));
+      setProviderDraft(modelResult.config.provider);
+      setBootstrap((current) => current ? { ...current, config: modelResult.config, modelProviderSettings: settings, needsOnboarding: needsModelProviderSetup(modelResult.config) } : current);
+      try {
+        const imageResult = await window.agentStudio.getImageProviderSettings() as { settings: ImageProviderSettings; config: AgentStudioConfig };
+        setImageProviderSettings(imageResult.settings);
+        setSelectedImageProviderId(resolveSelectedImageProviderId(imageResult.settings, imageResult.config));
+        setBootstrap((current) => current ? { ...current, config: imageResult.config, imageProviderSettings: imageResult.settings, needsOnboarding: needsModelProviderSetup(imageResult.config) } : current);
+      } catch (err) {
+        setImageSettingsError(err instanceof Error ? err.message : String(err));
+      }
     } catch (err) {
       setModelSettingsError(err instanceof Error ? err.message : String(err));
     }
@@ -1529,13 +1591,7 @@ export function App() {
   }
 
   function addProviderDefinition() {
-    const provider: ModelProviderDefinition = {
-      id: `provider-${crypto.randomUUID().slice(0, 8)}`,
-      name: "新的模型供应商",
-      baseUrl: "",
-      apiKey: "",
-      model: ""
-    };
+    const provider = createEditableModelProviderDefinition();
     setModelProviderSettings((current) => ({ ...current, providers: [...current.providers, provider] }));
     setSelectedProviderId(provider.id);
   }
@@ -1691,6 +1747,7 @@ export function App() {
             </div>
           )}
           <textarea
+            ref={composerTextareaRef}
             value={input}
             rows={isEmpty ? 3 : activeSession ? 1 : 3}
             placeholder={isEmpty ? "尽管问" : activeSession ? "继续提问..." : "尽管问"}
@@ -2082,9 +2139,9 @@ export function App() {
                   <div className="emptyComposerWrap">{renderComposer("empty")}</div>
                   <div className="quickGrid">
                     {emptyQuickPrompts.map((prompt) => (
-                      <button key={prompt} onClick={() => void sendPrompt(prompt)}>
+                      <button key={prompt.title} onClick={() => insertQuickPrompt(prompt)}>
                         <Sparkles size={17} />
-                        <span>{prompt}</span>
+                        <span>{prompt.title}</span>
                       </button>
                     ))}
                   </div>
@@ -2278,6 +2335,7 @@ export function App() {
           imageError={imageSettingsError}
           modelSaving={modelSettingsSaving}
           imageSaving={imageSettingsSaving}
+          initialView={settingsDialogInitialView}
           modelSettings={modelProviderSettings}
           imageSettings={imageProviderSettings}
           selectedProviderId={selectedProviderId}
@@ -2320,6 +2378,7 @@ function SettingsDialog({
   imageError,
   modelSaving,
   imageSaving,
+  initialView,
   modelSettings,
   imageSettings,
   selectedProviderId,
@@ -2347,6 +2406,7 @@ function SettingsDialog({
   imageError: string;
   modelSaving: boolean;
   imageSaving: boolean;
+  initialView: SettingsDialogInitialView;
   modelSettings: ModelProviderSettings;
   imageSettings: ImageProviderSettings;
   selectedProviderId: string;
@@ -2368,8 +2428,8 @@ function SettingsDialog({
   const selectedProvider = modelSettings.providers.find((provider) => provider.id === selectedProviderId) ?? modelSettings.providers[0] ?? null;
   const selectedImageProvider = imageSettings.imageProviders.find((provider) => provider.id === selectedImageProviderId) ?? imageSettings.imageProviders[0] ?? null;
   const saving = modelSaving || imageSaving;
-  const [activeSection, setActiveSection] = useState<SettingsSection>("providers");
-  const [activeProviderTab, setActiveProviderTab] = useState<ProviderSettingsTab>("model");
+  const [activeSection, setActiveSection] = useState<SettingsSection>(initialView.section);
+  const [activeProviderTab, setActiveProviderTab] = useState<ProviderSettingsTab>(initialView.providerTab);
   const [activeConnectorTab, setActiveConnectorTab] = useState<ConnectorSettingsTab>("xhs");
   const [deleteTarget, setDeleteTarget] = useState<ConnectorAccount | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -2381,6 +2441,11 @@ function SettingsDialog({
   useEffect(() => () => {
     if (copyFeedbackTimerRef.current !== undefined) window.clearTimeout(copyFeedbackTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    setActiveSection(initialView.section);
+    setActiveProviderTab(initialView.providerTab);
+  }, [initialView]);
 
   function switchSection(section: SettingsSection) {
     setActiveSection(section);
@@ -4912,8 +4977,13 @@ function getComposerPopoverRef(popover: ComposerPopover, refs: Record<ComposerPo
   return refs[popover];
 }
 
-function pickRandomPrompts(prompts: string[], count: number): string[] {
-  const unique = Array.from(new Set(prompts.filter((prompt) => prompt.trim().length > 0)));
+function pickRandomPrompts(prompts: WorkbenchQuickPrompt[], count: number): WorkbenchQuickPrompt[] {
+  const seen = new Set<string>();
+  const unique = prompts.filter((prompt) => {
+    if (!prompt.title.trim() || !prompt.prompt.trim() || seen.has(prompt.title)) return false;
+    seen.add(prompt.title);
+    return true;
+  });
   for (let index = unique.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(Math.random() * (index + 1));
     [unique[index], unique[swapIndex]] = [unique[swapIndex], unique[index]];
@@ -4931,6 +5001,32 @@ function splitModelTags(value: string): string[] {
     models.push(model);
   }
   return models;
+}
+
+function needsModelProviderSetup(config?: AgentStudioConfig): boolean {
+  return !config?.provider.baseUrl.trim() || !config.provider.apiKey.trim() || !config.provider.model.trim();
+}
+
+function isMissingModelProviderError(message: string): boolean {
+  return message.includes("请先配置模型供应商") || message.includes(missingModelProviderMessage);
+}
+
+function createEditableModelProviderDefinition(): ModelProviderDefinition {
+  return {
+    id: `provider-${crypto.randomUUID().slice(0, 8)}`,
+    name: "新的模型供应商",
+    baseUrl: "",
+    apiKey: "",
+    model: ""
+  };
+}
+
+function ensureEditableModelProviderSettings(settings: ModelProviderSettings): ModelProviderSettings {
+  if (settings.providers.length > 0) return settings;
+  return {
+    ...settings,
+    providers: [createEditableModelProviderDefinition()]
+  };
 }
 
 function resolveSelectedProviderId(settings: ModelProviderSettings, config?: AgentStudioConfig): string {

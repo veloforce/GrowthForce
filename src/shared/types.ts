@@ -399,7 +399,12 @@ export interface WorkspaceState {
 
 export interface WorkbenchPrompts {
   typingPrompts: string[];
-  quickPrompts: string[];
+  quickPrompts: WorkbenchQuickPrompt[];
+}
+
+export interface WorkbenchQuickPrompt {
+  title: string;
+  prompt: string;
 }
 
 export interface AutomationScheduleConfig {

@@ -1149,9 +1149,9 @@ button {
 
 .quickGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(190px, 1fr));
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
   gap: 16px;
-  width: min(880px, 100%);
+  width: min(820px, 100%);
 }
 
 .quickGrid button {
@@ -3839,7 +3839,7 @@ button {
 
 @media (max-width: 1120px) {
   .quickGrid {
-    grid-template-columns: repeat(2, minmax(190px, 1fr));
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
 }
 
@@ -4546,7 +4546,7 @@ select:focus-visible {
 
 .quickGrid {
   gap: 12px;
-  width: min(820px, 100%);
+  width: min(760px, 100%);
 }
 
 .quickGrid button {

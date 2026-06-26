@@ -347,8 +347,9 @@ function isPackagedRuntime(): boolean {
 }
 
 function validateConfig(request: AgentRunRequest): void {
-  if (!request.config.provider.apiKey && !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
-    throw new Error("缺少模型配置：请在 ~/.agentstudio/config.yml 设置 provider.apiKey");
+  const provider = request.config.provider;
+  if ((!provider.baseUrl || !provider.apiKey || !provider.model) && !process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN) {
+    throw new Error("请先配置模型供应商：请完整填写 Base URL、API Key 和 Model 后再提交。");
   }
 }
 

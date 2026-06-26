@@ -272,6 +272,97 @@ test("onboarding saves provider config after Anthropic-compatible HTTP check", a
   }
 });
 
+test("missing model provider on submit opens settings without consuming composer draft", async () => {
+  test.setTimeout(60_000);
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentstudio-submit-missing-provider-"));
+  const agentStudioDir = path.join(homeDir, ".agentstudio");
+  fs.mkdirSync(agentStudioDir, { recursive: true });
+  fs.writeFileSync(path.join(agentStudioDir, "config.yml"), [
+    "provider:",
+    "  id: ''",
+    "  baseUrl: https://api.example.com",
+    "  apiKey: test-key",
+    "  model: ''",
+    "workspace:",
+    "  defaultDir: ~/.agentstudio/workspace",
+    "user:",
+    "  name: Test User",
+    "  avatar: \"\"",
+    ""
+  ].join("\n"), "utf8");
+
+  const requests: Array<{ url?: string; headers: http.IncomingHttpHeaders; body: string }> = [];
+  const server = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk.toString();
+    });
+    req.on("end", () => {
+      requests.push({ url: req.url, headers: req.headers, body });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        id: "msg_test",
+        type: "message",
+        role: "assistant",
+        model: "claude-test",
+        content: [{ type: "text", text: "OK" }],
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 }
+      }));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Expected local HTTP server port");
+
+  const app = await electron.launch({
+    args: [path.resolve(__dirname, "../..")],
+    env: {
+      ...process.env,
+      HOME: homeDir,
+      VITE_DEV_SERVER_URL: ""
+    }
+  });
+
+  try {
+    const page = await app.firstWindow();
+    await expect(page.getByRole("heading", { name: "连接你的模型服务" })).toBeVisible();
+    await page.getByRole("button", { name: "跳过" }).click();
+    await expect(page.locator(".shell")).toBeVisible();
+
+    const draft = "这是一段提交前还没有模型配置的长文本，保存模型后应该仍然留在输入框里。";
+    await page.getByPlaceholder("尽管问").fill(draft);
+    await page.getByTitle("发送").click();
+
+    const settingsDialog = page.getByRole("dialog", { name: "账号设置" });
+    await expect(settingsDialog).toBeVisible();
+    const normalPanel = settingsDialog.getByRole("tabpanel", { name: "大模型供应商" });
+    await expect(normalPanel).toBeVisible();
+    await expect(normalPanel.getByRole("alert")).toContainText("请完整填写 Base URL、API Key 和 Model 后再提交。");
+    await expect(page.getByPlaceholder("尽管问")).toHaveValue(draft);
+    await expect(page.locator(".messageBubble", { hasText: draft })).toHaveCount(0);
+    await expect(page.locator(".sessionItem", { hasText: draft })).toHaveCount(0);
+    await expect(page.getByText("缺少模型配置")).toHaveCount(0);
+    await expect(normalPanel.locator(".providerRow.selected")).toBeVisible();
+
+    await normalPanel.getByLabel("供应商名称").fill("Submit Provider");
+    await normalPanel.getByLabel("Base URL").fill(`http://127.0.0.1:${address.port}`);
+    await normalPanel.getByPlaceholder("sk-...").fill("test-key");
+    await normalPanel.getByLabel("模型", { exact: true }).fill("claude-test");
+    await settingsDialog.getByRole("button", { name: "保存", exact: true }).click();
+
+    await expect(settingsDialog).toHaveCount(0);
+    await expect(page.getByPlaceholder("尽管问")).toHaveValue(draft);
+    expect(requests).toHaveLength(1);
+    expect(JSON.parse(requests[0].body)).toMatchObject({ model: "claude-test" });
+  } finally {
+    await app.close();
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
 test("account settings saves model provider registry and tests selected provider first model", async () => {
   test.setTimeout(60_000);
   const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentstudio-settings-"));

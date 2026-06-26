@@ -30,7 +30,12 @@ test("renderer workbench shows Electron-only notice in a browser", async ({ page
   await expect(page.getByText("小G · GrowthForce")).toBeVisible();
   await expect(page.locator(".brand")).toHaveCount(0);
   await expect(page.getByText("我是小G")).toBeVisible();
-  await expect(page.getByText("帮我分析当前项目结构并给出改进建议")).toBeVisible();
+  await expect(page.locator(".quickGrid button")).toHaveCount(4);
+  await expect(page.getByRole("button", { name: /热点选题/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /小红书笔记/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /内容复盘/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /账号诊断/ })).toBeVisible();
+  await expect(page.getByText("候选选题、推荐理由")).toHaveCount(0);
   await expect(page.getByPlaceholder("尽管问")).toBeVisible();
   await expect(page.getByRole("button", { name: "设置", exact: true })).toHaveCount(0);
   await expect(page.locator(".topActions").getByTitle("新会话")).toHaveCount(0);
@@ -441,7 +446,7 @@ test("workbench navigation always opens a new conversation", async ({ page }) =>
         modelProviderSettings: { providers: [] },
         imageProviderSettings: { imageProviders: [] },
         settings,
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["新对话提示"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "新对话提示", prompt: "填入后再发送的新对话提示" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: [oldSession]
       }),
@@ -484,6 +489,9 @@ test("workbench navigation always opens a new conversation", async ({ page }) =>
   await page.getByRole("button", { name: "工作台" }).click();
   await expect(page.getByText("历史消息内容")).toHaveCount(0);
   await expect(history).toBeVisible();
+  await page.getByRole("button", { name: /新对话提示/ }).click();
+  await expect(page.getByPlaceholder("尽管问")).toHaveValue("填入后再发送的新对话提示");
+  await expect.poll(() => page.evaluate(() => (window as Window & { __startTurnCalls?: Array<{ prompt?: string; sessionId?: number }> }).__startTurnCalls)).toEqual([]);
 
   await page.getByPlaceholder("尽管问").fill("全新创作");
   await page.getByTitle("发送").click();
@@ -521,7 +529,7 @@ test("renderer keeps browser surface offscreen until user opens right panel", as
         modelProviderSettings: { providers: [] },
         imageProviderSettings: { imageProviders: [] },
         settings,
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["黄金走势"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "黄金走势", prompt: "黄金走势" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -678,7 +686,7 @@ test("renderer keeps compact composer pickers and popover widths stable", async 
         imageProviderSettings: { imageProviders: [] },
         settings: settings(),
         theme: { themeMode: "system", resolved: "light" },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["固定宽度测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "固定宽度测试", prompt: "固定宽度测试" }] },
         connectorState,
         workspace: workspaceState,
         sessions: []
@@ -931,7 +939,7 @@ test("renderer switches composer model globally and keeps running supplements on
         modelProviderSettings,
         imageProviderSettings: { imageProviders: [] },
         settings: { chat: { permissionMode: "auto" }, connector: { xhs: { selected_account: "" }, wechat: { selected_account: "" } }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["模型切换"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "模型切换", prompt: "模型切换" }] },
         workspace: { currentPath: mockPaths.workspace, defaultPath: mockPaths.workspace, recentDirectories: [] },
         sessions: []
       }),
@@ -1018,7 +1026,7 @@ test("renderer shows standalone onboarding when provider config is incomplete", 
         imageProviderSettings: { imageProviders: [] },
         needsOnboarding: true,
         settings: { chat: { permissionMode: "auto" }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["延迟回复测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "延迟回复测试", prompt: "延迟回复测试" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -1111,7 +1119,7 @@ test("renderer saves provider config from onboarding before entering workbench",
         modelProviderSettings: { providers: [] },
         imageProviderSettings: { imageProviders: [] },
         settings: { chat: { permissionMode: "auto" }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["延迟回复测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "延迟回复测试", prompt: "延迟回复测试" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -1190,7 +1198,7 @@ test("renderer starts XHS login window when creating an account", async ({ page 
         },
         modelProviderSettings: { providers: [] },
         imageProviderSettings: { imageProviders: [] },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["新建小红书账号"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "新建小红书账号", prompt: "新建小红书账号" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -1322,7 +1330,7 @@ test("renderer restarts XHS login window for authorizing account", async ({ page
           workspace: { recentDirectories: [] },
           skills: { installed: {}, disabled: [] }
         },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["继续授权小红书账号"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "继续授权小红书账号", prompt: "继续授权小红书账号" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -1462,7 +1470,7 @@ test("renderer keeps XHS account status after login wait is cancelled", async ({
         config: completeConfig,
         needsOnboarding: false,
         settings: { chat: { permissionMode: "auto" }, connector: { xhs: { selected_account: "" } }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["重新授权"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "重新授权", prompt: "重新授权" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -1548,7 +1556,7 @@ test("renderer disables XHS connector panel while current session is running", a
         config: completeConfig,
         needsOnboarding: false,
         settings: { chat: { permissionMode: "auto" }, connector: { xhs: { selected_account: "" } }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["运行中会话"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "运行中会话", prompt: "运行中会话" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -1642,7 +1650,7 @@ test("renderer disables only locked XHS accounts when current session is idle", 
         config: completeConfig,
         needsOnboarding: false,
         settings: { chat: { permissionMode: "auto" }, connector: { xhs: { selected_account: "" } }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["账号锁测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "账号锁测试", prompt: "账号锁测试" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -1727,7 +1735,7 @@ test("composer ignores Enter while IME composition is active", async ({ page }) 
         config: completeConfig,
         needsOnboarding: false,
         settings: { chat: { permissionMode: "auto" }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["输入法测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "输入法测试", prompt: "输入法测试" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),
@@ -1818,7 +1826,7 @@ test("renderer renders assistant markdown without exposing raw markdown or html"
         config: completeConfig,
         needsOnboarding: false,
         settings: { chat: { permissionMode: "auto" }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["Markdown 渲染测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "Markdown 渲染测试", prompt: "Markdown 渲染测试" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: [session]
       }),
@@ -1913,7 +1921,7 @@ test("renderer keeps thinking and tool details collapsed with lightweight summar
         modelProviderSettings: { providers: [] },
         imageProviderSettings: { imageProviders: [] },
         settings: { chat: { permissionMode: "auto" }, connector: { xhs: { selected_account: "" }, wechat: { selected_account: "" } }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["折叠态测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "折叠态测试", prompt: "折叠态测试" }] },
         workspace: { currentPath: mockPaths.workspace, defaultPath: mockPaths.workspace, recentDirectories: [] },
         sessions: [session]
       }),
@@ -1987,7 +1995,7 @@ test("renderer computes and shows duration for live tool events", async ({ page 
         modelProviderSettings: { providers: [] },
         imageProviderSettings: { imageProviders: [] },
         settings: { chat: { permissionMode: "auto" }, connector: { xhs: { selected_account: "" }, wechat: { selected_account: "" } }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["实时工具耗时"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "实时工具耗时", prompt: "实时工具耗时" }] },
         workspace: { currentPath: mockPaths.workspace, defaultPath: mockPaths.workspace, recentDirectories: [] },
         sessions: [session]
       }),
@@ -2119,7 +2127,7 @@ test("renderer anchors artifact cards only for frontend write tools", async ({ p
         config: completeConfig,
         needsOnboarding: false,
         settings: { chat: { permissionMode: "auto" }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["产物位置测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "产物位置测试", prompt: "产物位置测试" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: [session]
       }),
@@ -2214,7 +2222,7 @@ test("renderer shows mock thinking until first real agent content", async ({ pag
         config: completeConfig,
         needsOnboarding: false,
         settings: { chat: { permissionMode: "auto" }, workspace: { recentDirectories: [] }, skills: { installed: {}, disabled: [] } },
-        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: ["延迟回复测试"] },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [{ title: "延迟回复测试", prompt: "延迟回复测试" }] },
         workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: [] },
         sessions: []
       }),

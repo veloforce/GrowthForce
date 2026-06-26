@@ -2515,7 +2515,7 @@ app.whenReady().then(() => {
   child.on("message", (message) => {
     clearTimeout(timer);
     child.kill();
-    if (message.type === "error" && String(message.message).includes("缺少模型配置")) {
+    if (message.type === "error" && String(message.message).includes("请先配置模型供应商")) {
       app.exit(0);
     } else {
       console.error(`Unexpected Agent process response: ${JSON.stringify(message)}`);

@@ -43,6 +43,7 @@ Skill，而不需要替换整个生命周期 Recipe。
 - 只有显式配置 JS CLI fallback 时才可能使用 JS runtime；生产打包应避免这种模式，必须优先使用 SDK optionalDependencies 中对应平台的 native binary
 - 执行项目 需要绑定一个本地目录，如果没有选择，默认 ~/.agentstudio/workspace
 - agent使用的 model provider（baseurl 、 ak 、model）等使用配置文件读取 `~/.agentstudio/config.yml` 的 `provider`。
+- 普通对话提交前必须检查 `provider.baseUrl`、`provider.apiKey`、`provider.model` 是否完整。首次启动缺失时进入 onboarding；已经进入工作台后提交缺失时打开账号设置里的“大模型”供应商弹窗，并保留输入框内容、附件、已选 Skill 和已选连接器账号，不创建失败会话。
 - 图片 Provider 配置使用 `providerType`、`baseUrl`、`apiKey`、`model` 等字段读取 `~/.agentstudio/config.yml` 的 `imageProvider`。图片生成工具位于 `resources/tools/image`，通过 MCP server 注入，调用时由 Agent 显式传入输出路径。该 server 同时提供无网络访问的 `image_template_list` 和 `image_template_generate`，按 `xhs_cover`、`xhs_content`、`gzh_cover`、`gzh_content` 过滤模板并完成结构化文字排版；封面支持标题与副标题，内容图支持标题与可换行正文，四类模板在渲染前校验 title/subtitle/content 字数，并使用随包分发的固定字体保证跨平台一致。是否在未配置 Provider 时使用模板由 Skill 决策。
 - 公众号文件处理工具位于 `resources/tools/wechat_content`，负责 Markdown 排版、HTML/Markdown
   转换、主题提取和文章分析。Markdown、HTML、主题 YAML、范文和报告均通过绝对路径交接；
