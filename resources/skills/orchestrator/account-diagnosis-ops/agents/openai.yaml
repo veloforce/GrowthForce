@@ -1,0 +1,4 @@
+interface:
+  display_name: "账号诊断"
+  short_description: "诊断小红书或公众号账号的定位、内容表现以及改进方向"
+  default_prompt: "Use $account-diagnosis-ops to diagnose the selected content account."

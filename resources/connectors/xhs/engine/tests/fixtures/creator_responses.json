@@ -1,0 +1,327 @@
+{
+  "userInfo": {
+    "result": 0,
+    "success": true,
+    "code": 0,
+    "data": {
+      "userId": "<redacted>",
+      "userName": "悠哉",
+      "userAvatar": "https://example.invalid/avatar.jpg",
+      "userDesc": "还没有简介",
+      "redId": "<redacted>",
+      "role": "creator",
+      "permissions": ["creatorHome", "creatorData"],
+      "zone": "86",
+      "phone": "138****0000",
+      "realNameVerified": false,
+      "skillhubInfo": {"realNameVerified": false},
+      "longAudioConfig": {"hasAudio": true}
+    }
+  },
+  "personalInfo": {
+    "result": 0,
+    "success": true,
+    "code": 0,
+    "data": {
+      "name": "悠哉",
+      "avatar": "https://example.invalid/avatar-large.jpg",
+      "follow_count": 230,
+      "fans_count": 14,
+      "faved_count": 66,
+      "red_num": "42664382235",
+      "personal_desc": "还没有简介",
+      "diagnosis_status": 1,
+      "live_info": {"live_status": 0, "live_data_link": null},
+      "grow_info": {"level": 1, "fans_count": 14, "max_fans_count": 500, "min_fans_count": 0}
+    }
+  },
+  "accountBase": {
+    "code": 0,
+    "success": true,
+    "msg": "成功",
+    "data": {
+      "seven": {
+        "begin_time": 1781539200000,
+        "end_time": 1782057600000,
+        "summary": "你的笔记观看量不断飞速上涨",
+        "impl_count": 167,
+        "view_count": 26,
+        "cover_click_rate": 14.5,
+        "video_full_view_rate": 0,
+        "avg_view_time": 13.4,
+        "view_time_avg": 219,
+        "home_view_count": 0,
+        "like_count": 0,
+        "collect_count": 0,
+        "comment_count": 0,
+        "danmaku_count": 0,
+        "share_count": 0,
+        "rise_fans_count": 0,
+        "loss_fans_count": 0,
+        "net_rise_fans_count": 0,
+        "home_conversion_rise_fans_rate": 0,
+        "publish_note_num": 0,
+        "publish_normal_note_num": 0,
+        "publish_video_note_num": 0,
+        "impl_count_rate": 1.2,
+        "impl_count_rate_display": true,
+        "impl_count_list": [{"date": 1781539200000, "count": 12, "count_with_double": 12.0}],
+        "set_impl_count": 167,
+        "impl_count_list_iterator": null,
+        "impl_count_list_size": 7
+      },
+      "thirty": {
+        "begin_time": 1779552000000,
+        "end_time": 1782057600000,
+        "summary": "你的笔记观看量不断飞速上涨",
+        "impl_count": 203,
+        "view_count": 28,
+        "cover_click_rate": 12.9,
+        "video_full_view_rate": 0,
+        "avg_view_time": 7.5,
+        "view_time_avg": 228,
+        "home_view_count": 0,
+        "like_count": 0,
+        "collect_count": 0,
+        "comment_count": 0,
+        "danmaku_count": 0,
+        "share_count": 0,
+        "rise_fans_count": 0,
+        "loss_fans_count": 0,
+        "net_rise_fans_count": 0,
+        "home_conversion_rise_fans_rate": 0,
+        "publish_note_num": 1,
+        "publish_normal_note_num": 1,
+        "publish_video_note_num": 0,
+        "impl_count_list": [{"date": 1779552000000, "count": 1, "count_with_double": 1.0}]
+      },
+      "analyse_infos": [
+        {
+          "quota": "readFeed",
+          "count": 26,
+          "scale": 0.0825,
+          "summary": "超过8%同类",
+          "special_display": "有待提升",
+          "priority": 1,
+          "begin_time": 1781539200000,
+          "end_time": 1782057600000
+        }
+      ]
+    }
+  },
+  "noteDetail": {
+    "result": 0,
+    "success": true,
+    "code": 0,
+    "data": {
+      "seven": {
+        "view_count": 26,
+        "view_time_avg": 219,
+        "home_view_count": 0,
+        "like_count": 0,
+        "collect_count": 0,
+        "comment_count": 0,
+        "danmaku_count": 0,
+        "share_count": 0,
+        "rise_fans_count": 0,
+        "view_list": [{"date": 1781539200000, "count": 1}],
+        "view_list_size": 7
+      },
+      "thirty": {
+        "view_count": 28,
+        "view_time_avg": 228,
+        "home_view_count": 0,
+        "like_count": 0,
+        "collect_count": 0,
+        "comment_count": 0,
+        "danmaku_count": 0,
+        "share_count": 0,
+        "rise_fans_count": 0,
+        "view_list": [{"date": 1779552000000, "count": 1}],
+        "view_list_size": 30
+      }
+    }
+  },
+  "fansOverall": {
+    "result": 0,
+    "success": true,
+    "code": 0,
+    "data": {
+      "seven": {
+        "rise_fans_count": 0,
+        "leave_fans_count": 0,
+        "fans_count": 14,
+        "rise_fans_list": [{"date": 1781539200000, "count": 0}],
+        "leave_fans_list": [{"date": 1781539200000, "count": 0}],
+        "fans_list": [{"date": 1781539200000, "count": 14}],
+        "fans_list_size": 7
+      },
+      "thirty": {
+        "rise_fans_count": 0,
+        "leave_fans_count": 0,
+        "fans_count": 14,
+        "rise_fans_list": [{"date": 1779552000000, "count": 0}],
+        "leave_fans_list": [{"date": 1779552000000, "count": 0}],
+        "fans_list": [{"date": 1779552000000, "count": 14}],
+        "fans_list_size": 30
+      }
+    }
+  },
+  "activeFans": {
+    "result": 0,
+    "success": true,
+    "code": 0,
+    "data": {"seven": [], "thirty": [], "seven_size": 0, "thirty_size": 0}
+  },
+  "permission": {
+    "code": 0,
+    "success": true,
+    "msg": "成功",
+    "data": {
+      "display": 1,
+      "display_more_data": 0,
+      "status": 0,
+      "tip_msg": "已为您申请数据权限，次日可查看",
+      "result": {"success": true, "code": 0, "message": "success"}
+    }
+  },
+  "audienceSource": {
+    "code": 0,
+    "success": true,
+    "msg": "成功",
+    "data": {
+      "seven": [],
+      "thirty": [],
+      "seven_tip_msg": "观看数不足50，暂时无法分析",
+      "thirty_tip_msg": "观看数不足50，暂时无法分析",
+      "seven_begin_time": 1781539200000,
+      "seven_end_time": 1782144000000,
+      "thirty_begin_time": 1779552000000,
+      "thirty_end_time": 1782144000000
+    }
+  },
+  "audiencePeriods": {
+    "code": 0,
+    "success": true,
+    "msg": "成功",
+    "data": {
+      "seven": [],
+      "thirty": [],
+      "seven_tip_msg": "观看数不足50，暂时无法分析",
+      "thirty_tip_msg": "观看数不足50，暂时无法分析",
+      "seven_begin_time": 1781539200000,
+      "seven_end_time": 1782144000000,
+      "thirty_begin_time": 1779552000000,
+      "thirty_end_time": 1782144000000
+    }
+  },
+  "liveOverview": {
+    "code": 0,
+    "success": true,
+    "msg": "成功",
+    "data": {
+      "live_overview_data": {
+        "valid_live_num": 0,
+        "duration_of_live": 0,
+        "average_num_of_viewers": 0,
+        "average_num_of_interactive": 0,
+        "num_of_new_fans": 0,
+        "num_of_potato_diamonds": 0,
+        "seller_real_income_amount": 0,
+        "deal_pkg_cnt": 0,
+        "dtm": ""
+      }
+    }
+  },
+  "notePages": [
+    {
+      "code": 0,
+      "success": true,
+      "msg": "成功",
+      "data": {
+        "notes": [
+          {
+            "id": "note-video",
+            "display_title": "教师节花式祝福",
+            "type": "video",
+            "tab_status": 1,
+            "permission_code": 0,
+            "permission_msg": "",
+            "visible_time": 1725924606,
+            "schedule_post_time": 0,
+            "time": "2024-09-10 07:29",
+            "view_count": 267,
+            "likes": 1,
+            "collected_count": 1,
+            "comments_count": 0,
+            "shared_count": 1,
+            "sticky": true,
+            "cocreate": false,
+            "images_list": [{"url": "https://example.invalid/video-cover.jpg"}],
+            "video_info": {"duration": 16},
+            "xsec_token": "must-not-leak",
+            "xsec_source": "pc_creatormng"
+          }
+        ],
+        "tags": [{"id": "special.note_time_desc", "name": "所有笔记", "notes_count": 16, "checked": true}],
+        "page": 1
+      }
+    },
+    {
+      "code": 0,
+      "success": true,
+      "msg": "成功",
+      "data": {
+        "notes": [
+          {
+            "id": "note-normal",
+            "display_title": "大众赛道投稿| AIGC设计的服装",
+            "type": "normal",
+            "tab_status": 1,
+            "permission_code": 0,
+            "permission_msg": "",
+            "visible_time": 1720760460,
+            "schedule_post_time": 0,
+            "time": "2024-07-12 15:41",
+            "view_count": 239,
+            "likes": 8,
+            "collected_count": 0,
+            "comments_count": 1,
+            "shared_count": 2,
+            "sticky": false,
+            "cocreate": false,
+            "images_list": [{"url": "https://example.invalid/image-cover.jpg"}],
+            "xsec_token": "must-not-leak"
+          }
+        ],
+        "tags": [{"id": "special.note_time_desc", "name": "所有笔记", "notes_count": 16, "checked": true}],
+        "page": -1
+      }
+    }
+  ],
+  "noteAnalysis": {
+    "code": 0,
+    "success": true,
+    "msg": "成功",
+    "data": {
+      "result": {"success": true, "code": 0, "message": "success"},
+      "note_infos": [
+        {
+          "id": "note-normal",
+          "cover_url": "https://example.invalid/image-cover.jpg",
+          "type": 1,
+          "audit_status": 1,
+          "post_time": 1777281753000,
+          "update_time": 1777281809000,
+          "user_update_time": 1777281753000,
+          "read_count": 5,
+          "like_count": 0,
+          "fav_count": 0,
+          "comment_count": 0,
+          "share_count": 0
+        }
+      ],
+      "total": 1
+    }
+  }
+}

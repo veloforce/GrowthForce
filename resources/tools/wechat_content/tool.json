@@ -1,0 +1,5 @@
+{
+  "name": "wechat_content",
+  "description": "公众号文件排版、HTML/Markdown 转换、主题提取和文章分析工具",
+  "entry": "dist/index.js"
+}

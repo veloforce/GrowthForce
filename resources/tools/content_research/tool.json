@@ -1,0 +1,5 @@
+{
+  "name": "content_research",
+  "description": "公开内容研究工具：泛热点、关键词热点和竞品公开内容抓取",
+  "entry": "dist/index.js"
+}

@@ -1,0 +1,5 @@
+{
+  "name": "browser",
+  "description": "通用浏览器搜索与网页抓取工具",
+  "entry": "dist/index.js"
+}

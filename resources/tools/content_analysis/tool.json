@@ -1,0 +1,5 @@
+{
+  "name": "content_analysis",
+  "description": "无状态内容版本对比和历史语料模式分析工具",
+  "entry": "dist/index.js"
+}

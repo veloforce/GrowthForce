@@ -1,0 +1,5 @@
+{
+  "name": "wechat_ops",
+  "description": "公众号原始指标、已发布文章、草稿读取和草稿箱推送工具",
+  "entry": "dist/index.js"
+}

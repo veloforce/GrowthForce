@@ -1,0 +1,5 @@
+{
+  "name": "content_ops_data",
+  "description": "平台无关的内容运营账号定位、长期数据和 Run 生命周期存储工具",
+  "entry": "dist/index.js"
+}

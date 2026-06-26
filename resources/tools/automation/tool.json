@@ -1,0 +1,5 @@
+{
+  "name": "automation",
+  "description": "查询、创建、暂停、重新开启和删除 GrowthForce 自动化定时任务",
+  "entry": "dist/index.js"
+}

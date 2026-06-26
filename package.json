@@ -1,0 +1,118 @@
+{
+  "name": "growthforce",
+  "version": "0.1.10",
+  "description": "GrowthForce desktop workspace",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "generate:icons": "node scripts/generate-app-icons.cjs",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit false && npm run typecheck:tools",
+    "typecheck:tools": "node scripts/typecheck-tools.cjs",
+    "compile": "npm run typecheck && npm run build:renderer && npm run build:node && npm run build:tools",
+    "build:xhs-sidecar": "node scripts/build-xhs-sidecar.cjs",
+    "build:tools": "node scripts/build-tools.cjs",
+    "build": "bash scripts/build.sh",
+    "build:renderer": "vite build",
+    "build:node": "tsc -p tsconfig.node.json",
+    "verify:package": "node scripts/verify-package.cjs",
+    "test:dependency-sync": "node tests/smoke/dependency-sync.cjs",
+    "test:wechat-content": "npm run build:tools && node tests/smoke/wechat-content.cjs",
+    "test:content-ops-data": "npm run build:tools && node tests/smoke/content-ops-data.cjs",
+    "test:xhs-capabilities": "npm run build:node && npm run build:tools && node tests/smoke/xhs-capabilities.cjs",
+    "test:xhs-account-refresh": "npm run build:node && npm run build:tools && node tests/smoke/xhs-account-refresh.cjs",
+    "test:browser": "bash tests/smoke/browser-agent.sh",
+    "test:browser:playwright": "playwright test -c playwright.browser.config.ts",
+    "test:electron": "playwright test -c playwright.electron.config.ts",
+    "test:claude": "playwright test -c playwright.claude.config.ts",
+    "test:build": "bash tests/smoke/build.sh",
+    "test:all": "npm run test:dependency-sync && npm run build && npm run test:xhs-capabilities && npm run test:xhs-account-refresh && npm run test:browser && npm run test:electron && npm run test:build",
+    "package:mac": "npm run generate:icons && npm run build:xhs-sidecar && npm run compile && electron-builder --mac dmg",
+    "package:mac:x64": "npm run generate:icons && npm run build:xhs-sidecar -- --platform darwin --arch x64 && npm run compile && electron-builder --mac dmg --x64",
+    "package:mac:arm64": "npm run generate:icons && npm run build:xhs-sidecar -- --platform darwin --arch arm64 && npm run compile && electron-builder --mac dmg --arm64",
+    "package:win": "npm run generate:icons && npm run build:xhs-sidecar -- --platform win32 --arch x64 && npm run compile && electron-builder --win nsis --x64",
+    "release:tag": "bash scripts/push-release-tag.sh",
+    "release:next": "bash scripts/tag.sh"
+  },
+  "keywords": [
+    "electron",
+    "agent",
+    "claude"
+  ],
+  "author": "",
+  "license": "Apache-2.0",
+  "private": true,
+  "build": {
+    "appId": "com.growthforce.desktop",
+    "productName": "GrowthForce",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/sql.js/dist/*.wasm",
+      "node_modules/@anthropic-ai/claude-agent-sdk-*/**"
+    ],
+    "files": [
+      "dist/**",
+      "package.json",
+      "node_modules/**"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "afterPack": "scripts/electron-builder-after-pack.cjs",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg"
+      ]
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis"
+      ]
+    }
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.143",
+    "cheerio": "^1.2.0",
+    "highlight.js": "^11.11.1",
+    "js-yaml": "^4.1.1",
+    "lucide-react": "^1.16.0",
+    "markdown-it": "^14.2.0",
+    "pureimage": "^0.4.18",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "sql.js": "^1.14.1",
+    "turndown": "^7.2.4",
+    "undici": "^6.25.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^25.8.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/sql.js": "^1.4.11",
+    "@types/turndown": "^5.0.6",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "electron": "^41.6.1",
+    "electron-builder": "^26.8.1",
+    "esbuild": "^0.28.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.13",
+    "wait-on": "^9.0.10"
+  }
+}

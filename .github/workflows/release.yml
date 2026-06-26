@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-release:
+    name: Prepare GitHub Release
+    runs-on: ubuntu-latest
+    outputs:
+      tag-name: ${{ github.ref_name }}
+    steps:
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release view "$TAG_NAME" --repo "$GH_REPO" >/dev/null 2>&1 || gh release create "$TAG_NAME" --repo "$GH_REPO" --title "$TAG_NAME" --notes "AgentStudio $TAG_NAME"
+
+  build-mac-x64:
+    name: Build macOS x64 DMG
+    runs-on: macos-15-intel
+    needs: prepare-release
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: npm ci --include=optional
+      - run: node -e "require('fs').accessSync('node_modules/@anthropic-ai/claude-agent-sdk-darwin-x64/claude')"
+      - run: npm run generate:icons
+      - run: npm run build:xhs-sidecar
+      - run: npm run compile
+      - run: npx electron-builder --mac dmg --x64 --publish never
+      - run: npm run verify:package -- --platform darwin --arch x64
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag-name }}
+        run: gh release upload "$TAG_NAME" release/*.dmg --repo "$GH_REPO" --clobber
+
+  build-mac-arm64:
+    name: Build macOS arm64 DMG
+    runs-on: macos-15
+    needs: prepare-release
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: npm ci --include=optional
+      - run: node -e "require('fs').accessSync('node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude')"
+      - run: npm run generate:icons
+      - run: npm run build:xhs-sidecar
+      - run: npm run compile
+      - run: npx electron-builder --mac dmg --arm64 --publish never
+      - run: npm run verify:package -- --platform darwin --arch arm64
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag-name }}
+        run: gh release upload "$TAG_NAME" release/*.dmg --repo "$GH_REPO" --clobber
+
+  build-win-x64:
+    name: Build Windows x64 NSIS
+    runs-on: windows-latest
+    needs: prepare-release
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: "false"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: npm ci --include=optional
+      - run: node -e "require('fs').accessSync('node_modules/@anthropic-ai/claude-agent-sdk-win32-x64/claude.exe')"
+      - run: npm run generate:icons
+      - run: npm run build:xhs-sidecar
+      - run: npm run compile
+      - run: npx electron-builder --win nsis --x64 --publish never
+      - run: npm run verify:package -- --platform win32 --arch x64
+      - name: Upload release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag-name }}
+        run: gh release upload "$TAG_NAME" release/*.exe --repo "$GH_REPO" --clobber

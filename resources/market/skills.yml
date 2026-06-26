@@ -1,0 +1,7 @@
+orchestrator:
+  - name: baoyu-markdown-to-html
+    description: markdown转html，支持多种公众号主题
+    skillMdUrl: https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-markdown-to-html/SKILL.md
+  - name: baoyu-wechat-summary
+    description: 微信群聊总结
+    skillMdUrl: https://github.com/JimLiu/baoyu-skills/blob/main/skills/baoyu-wechat-summary/SKILL.md

@@ -1,0 +1,102 @@
+# Local contributor instructions
+/agents.md
+/AGENTS.md
+
+# Internal planning and iteration history
+/docs/changes/
+/docs/plan/
+
+# Internal design docs
+/docs/design/
+
+# Dependencies
+/node_modules/
+
+# Environment variables and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Browser sessions, cookies, and captured auth state
+cookies.json
+/.xhs/
+.auth/
+playwright/.auth/
+storage-state*.json
+
+# Build and package output
+/dist/
+/build/
+/release/
+/.build/
+/resources/connectors/xhs/bin/
+/resources/content.bck/
+/resources/tools/*/dist/
+
+# Packaged app artifacts and archives
+*.dmg
+*.exe
+*.msi
+*.AppImage
+*.asar
+*.zip
+*.tar
+*.tgz
+*.gz
+
+# Local app and runtime data
+/.agentstudio/
+/.superpowers/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Test output and coverage
+/test-results/
+/playwright-report/
+/blob-report/
+/coverage/
+
+# Network capture and local diagnostics
+*.har
+*.trace
+trace.zip
+netlog*.json
+*xhs-netlog*.json
+diagnostics*.json
+*xhs-diagnostics*.json
+
+# Logs and caches
+*.log
+/.cache/
+/.npm-cache/
+/.vite/
+
+# Python generated files and environments
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Signing and provisioning files
+*.cer
+*.crt
+*.mobileprovision
+*.provisionprofile

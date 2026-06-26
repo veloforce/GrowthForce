@@ -1,0 +1,5 @@
+{
+  "name": "connector_ops",
+  "description": "更新当前 Agent Run 绑定的平台连接器状态",
+  "entry": "dist/index.js"
+}

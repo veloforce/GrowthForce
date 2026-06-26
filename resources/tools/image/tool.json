@@ -1,0 +1,5 @@
+{
+  "name": "image",
+  "description": "远程图片生成与本地模板排版工具",
+  "entry": "dist/index.js"
+}
