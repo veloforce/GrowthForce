@@ -1,6 +1,6 @@
 {
   "name": "growthforce",
-  "version": "0.1.10",
+  "version": "0.1.12",
   "description": "GrowthForce desktop workspace",
   "main": "dist/main/main.js",
   "scripts": {
