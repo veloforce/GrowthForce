@@ -52,7 +52,12 @@ More than a data dashboard. The AI Agent automatically analyzes each post's perf
 
 ### One-Click Install, Ready to Use
 
-Download DMG / EXE, double-click to install, open and go.
+Download the installer from [GitHub Releases](https://github.com/veloforce/GrowthForce/releases/) and choose the package for your platform:
+
+- **macOS**: download the DMG (choose Apple Silicon or Intel based on your device)
+- **Windows**: download the EXE
+
+After downloading, double-click to install, then open and go.
 
 - **No Codex installation needed** — Agent runtime is built-in
 - **No workflow configuration needed** — Pre-built content operations Skills and Tools included
