@@ -35,6 +35,12 @@ test("renderer workbench shows Electron-only notice in a browser", async ({ page
   await expect(page.getByRole("button", { name: /小红书笔记/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /内容复盘/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /账号诊断/ })).toBeVisible();
+  const quickPromptButtons = page.locator(".quickGrid button");
+  const quickPromptHeights = await quickPromptButtons.evaluateAll((buttons) => buttons.map((button) => Math.round(button.getBoundingClientRect().height)));
+  expect(Math.max(...quickPromptHeights)).toBeLessThanOrEqual(44);
+  expect(Math.min(...quickPromptHeights)).toBeGreaterThanOrEqual(38);
+  const quickPromptIcons = await quickPromptButtons.locator("svg").evaluateAll((icons) => icons.map((icon) => icon.innerHTML));
+  expect(new Set(quickPromptIcons).size).toBe(4);
   await expect(page.getByText("候选选题、推荐理由")).toHaveCount(0);
   await expect(page.getByPlaceholder("尽管问")).toBeVisible();
   await expect(page.getByRole("button", { name: "设置", exact: true })).toHaveCount(0);
@@ -56,6 +62,26 @@ test("renderer workbench shows Electron-only notice in a browser", async ({ page
   await expect(page.getByRole("button", { name: "内容日更" })).toBeVisible();
   await expect(page.getByRole("button", { name: "竞品号监控" })).toBeVisible();
   await expect(page.getByRole("button", { name: "数据监控" })).toBeVisible();
+  await expect(page.locator(".animatedClock")).toBeVisible();
+  await expect(page.locator(".minuteHand")).toHaveCSS("animation-duration", "3s");
+  await expect(page.locator(".minuteHand")).toHaveCSS("animation-iteration-count", "1");
+  await expect(page.locator(".hourHand")).toHaveCSS("animation-name", "none");
+  const staticHourTransform = await page.locator(".hourHand").evaluate((hand) => getComputedStyle(hand).transform);
+  await page.waitForTimeout(3200);
+  await expect.poll(async () => page.locator(".minuteHand").evaluate((hand) => hand.getAnimations()[0]?.playState)).toBe("finished");
+  await expect(page.locator(".hourHand")).toHaveCSS("transform", staticHourTransform);
+  await page.getByRole("button", { name: "工作台" }).click();
+  await page.getByRole("button", { name: "自动化运营" }).click();
+  await expect(page.locator(".animatedClock")).toBeVisible();
+  const restartedClockAnimation = await page.locator(".minuteHand").evaluate((hand) => {
+    const animation = hand.getAnimations()[0];
+    return {
+      currentTime: typeof animation?.currentTime === "number" ? animation.currentTime : 0,
+      playState: animation?.playState
+    };
+  });
+  expect(restartedClockAnimation.currentTime).toBeLessThan(1000);
+  expect(["running", "pending"]).toContain(restartedClockAnimation.playState);
 });
 
 test("renderer handles normal tool permission actions", async ({ page }) => {
@@ -797,6 +823,22 @@ test("renderer keeps compact composer pickers and popover widths stable", async 
   await expect.poll(() => widthOf(".connectorPicker")).toBe(connectorWidth);
   await expect.poll(() => widthOf(".connectorMenu")).toBe(connectorMenuWidth);
   await expect.poll(() => xhsMenuItem.locator(".connectorSubmenu").evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(connectorSubmenuWidth);
+
+  await page.mouse.move(0, 0);
+  const pickerStyle = async (selector: string) => page.locator(selector).evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor, shadow: style.boxShadow };
+  });
+  const defaultPickerStyle = await pickerStyle(".workspacePicker");
+  await expect.poll(() => pickerStyle(".connectorPicker")).toEqual(defaultPickerStyle);
+  await expect.poll(() => pickerStyle(".permissionPicker")).toEqual(defaultPickerStyle);
+  await expect.poll(() => pickerStyle(".modelPicker")).toEqual(defaultPickerStyle);
+  for (const selector of [".workspacePicker", ".connectorPicker", ".permissionPicker", ".modelPicker"]) {
+    await page.locator(selector).hover();
+    await expect.poll(() => pickerStyle(selector)).toEqual(expect.objectContaining({ background: defaultPickerStyle.background }));
+    await expect.poll(() => pickerStyle(selector).then((style) => style.shadow)).not.toBe(defaultPickerStyle.shadow);
+    await page.mouse.move(0, 0);
+  }
 
   await page.locator(".workspacePicker").click();
   const workspaceMenuWidth = await widthOf(".workspaceMenu");

@@ -169,8 +169,17 @@ test("automation creates a bounded day interval with fixed full access", async (
   try {
     const page = await app.firstWindow();
     await page.getByRole("button", { name: "自动化运营" }).click();
+    await page.getByRole("button", { name: "数据监控" }).click();
+    let dialog = page.getByRole("dialog", { name: "创建自动化" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("任务名称")).toHaveValue("数据监控");
+    await expect(dialog.getByLabel("任务描述")).toHaveValue(/当前账号近期数据指标/);
+    await expect(dialog.getByLabel("任务描述")).toHaveValue(/浏览量\/阅读量、点赞、收藏、评论、和粉丝变化/);
+    await expect(dialog.getByLabel("任务描述")).not.toHaveValue(/项目目录/);
+    await page.getByTitle("关闭").click();
+    await expect(dialog).toHaveCount(0);
     await page.getByRole("button", { name: "创建首个自动化" }).click();
-    const dialog = page.getByRole("dialog", { name: "创建自动化" });
+    dialog = page.getByRole("dialog", { name: "创建自动化" });
     const dialogSkillGroup = dialog.locator(".automationContextGroup", { hasText: "使用 Skill" });
     await expect(dialogSkillGroup.getByText("暂无已启用 Skill")).toHaveCount(0);
     await expect(dialogSkillGroup.locator(".automationContextOptions button").first()).toBeVisible();
@@ -1114,7 +1123,7 @@ test("built Electron app opens workbench and handles a submitted turn", async ()
     await expect(page.getByPlaceholder("尽管问")).toBeVisible();
     await expect(page.getByTitle("添加")).toBeVisible();
     await expect(page.locator(".permissionPicker")).toBeVisible();
-    await expect(page.locator(".quickGrid button")).toHaveCount(6);
+    await expect(page.locator(".quickGrid button")).toHaveCount(4);
 
     await page.getByRole("button", { name: "打开右侧面板" }).click();
     await expect(page.locator(".rightPanel.open")).toHaveCount(1);
@@ -1156,13 +1165,14 @@ test("built Electron app opens workbench and handles a submitted turn", async ()
     await expect(page.locator(".workspaceMenu")).toBeVisible();
     await page.locator(".workspaceRecentItem", { hasText: "recent-two" }).click();
     await expect(page.locator(".workspaceMenu")).toHaveCount(0);
-    await expect(page.locator(".workspacePicker")).toHaveText("");
+    await expect(page.locator(".workspacePicker")).toHaveText("recent-two");
     await expect(page.locator(".workspacePicker")).toHaveAttribute("aria-label", /recent-two/);
     const connectorPickerBox = await page.locator(".connectorPicker").boundingBox();
     const workspacePickerBox = await page.locator(".workspacePicker").boundingBox();
     const permissionPickerBox = await page.locator(".permissionPicker").boundingBox();
     expect(connectorPickerBox?.width).toBe(32);
-    expect(workspacePickerBox?.width).toBe(32);
+    expect(workspacePickerBox?.width ?? 0).toBeGreaterThan(32);
+    expect(workspacePickerBox?.width ?? 0).toBeLessThanOrEqual(220);
     expect(permissionPickerBox?.width).toBe(32);
 
     const expandedSidebarBox = await page.locator(".sidebar").boundingBox();

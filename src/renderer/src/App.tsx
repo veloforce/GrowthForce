@@ -120,6 +120,8 @@ const fallbackWorkbenchPrompts: WorkbenchPrompts = {
   ]
 };
 
+const quickPromptIcons = [Lightbulb, FileText, BarChart3, Shield];
+
 const emptyConnectorState: ConnectorState = {
   accounts: [],
   selected: { xhs: "", wechat: "" },
@@ -2138,12 +2140,15 @@ export function App() {
                   <h1 className="typingPrompt">{typedPrompt}</h1>
                   <div className="emptyComposerWrap">{renderComposer("empty")}</div>
                   <div className="quickGrid">
-                    {emptyQuickPrompts.map((prompt) => (
-                      <button key={prompt.title} onClick={() => insertQuickPrompt(prompt)}>
-                        <Sparkles size={17} />
-                        <span>{prompt.title}</span>
-                      </button>
-                    ))}
+                    {emptyQuickPrompts.map((prompt, index) => {
+                      const QuickPromptIcon = quickPromptIcons[index % quickPromptIcons.length] ?? Sparkles;
+                      return (
+                        <button key={prompt.title} onClick={() => insertQuickPrompt(prompt)}>
+                          <QuickPromptIcon size={17} />
+                          <span>{prompt.title}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               ) : (
@@ -4827,17 +4832,17 @@ function formatDateTime(value: string): string {
 const automationPresets = [
   {
     name: "内容日更",
-    description: "请根据当前项目资料，生成今天适合发布的内容选题、正文草稿和下一步行动建议。",
+    description: "请围绕当前内容账号的定位、近期热点，进行选题、生成内容并发布。",
     icon: Bell
   },
   {
     name: "竞品号监控",
-    description: "请检查并总结竞品账号近期内容变化，提炼值得关注的主题、表达方式和可借鉴方向。",
+    description: "请围绕当前内容账号的定位和目标用户，检查相关竞品账号近期内容变化，提炼值得关注的主题、表达方式和可借鉴方向。",
     icon: CalendarClock
   },
   {
     name: "数据监控",
-    description: "请分析项目目录中的最新数据或记录，输出关键变化、异常项和建议动作。",
+    description: "请监控当前账号近期数据指标，比如浏览量/阅读量、点赞、收藏、评论、和粉丝变化，输出关键变化、异常项和建议动作。",
     icon: BarChart3
   }
 ];

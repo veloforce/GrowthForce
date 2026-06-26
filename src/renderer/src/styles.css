@@ -1149,23 +1149,23 @@ button {
 
 .quickGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(140px, 1fr));
-  gap: 16px;
-  width: min(820px, 100%);
+  grid-template-columns: repeat(4, minmax(118px, 1fr));
+  gap: 10px;
+  width: min(660px, 100%);
 }
 
 .quickGrid button {
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 58px;
-  padding: 0 22px;
-  border-radius: 14px;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 8px;
   color: #182764;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: inset 0 0 0 1px rgba(57, 80, 146, 0.12), 0 14px 32px rgba(56, 80, 146, 0.08);
-  font-size: 16px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .quickGrid button span {
@@ -3005,7 +3005,7 @@ button {
   height: 116px;
   border: 9px solid #20232b;
   border-radius: 50%;
-  animation: clockBreath 2.8s ease-in-out infinite;
+  animation: clockBreath 3s ease-in-out 1 forwards;
 }
 
 .clockHand {
@@ -3020,12 +3020,12 @@ button {
 
 .hourHand {
   height: 32px;
-  animation: clockHour 24s linear infinite;
+  transform: translateX(-50%) rotate(35deg);
 }
 
 .minuteHand {
   height: 42px;
-  animation: clockMinute 4s linear infinite;
+  animation: clockMinute 3s linear 1 forwards;
 }
 
 .clockDot {
@@ -3082,15 +3082,6 @@ button {
   }
   to {
     transform: translateX(-50%) rotate(360deg);
-  }
-}
-
-@keyframes clockHour {
-  from {
-    transform: translateX(-50%) rotate(35deg);
-  }
-  to {
-    transform: translateX(-50%) rotate(395deg);
   }
 }
 
@@ -4546,14 +4537,14 @@ select:focus-visible {
 }
 
 .quickGrid {
-  gap: 12px;
-  width: min(760px, 100%);
+  gap: 10px;
+  width: min(660px, 100%);
 }
 
 .quickGrid button {
-  min-height: 50px;
-  padding: 0 16px;
-  border-radius: 10px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 8px;
   color: var(--text-primary);
   box-shadow: inset 0 0 0 1px var(--border-default);
   font-size: 15px;
@@ -5367,7 +5358,7 @@ select:disabled {
 }
 
 .quickGrid button {
-  min-height: 46px;
+  min-height: 42px;
   color: var(--text-primary);
   line-height: 1.35;
 }
@@ -5422,6 +5413,24 @@ select:disabled {
   color: var(--text-secondary);
   font-size: var(--font-control);
   font-weight: var(--weight-control);
+}
+
+.connectorPicker,
+.connectorPicker.selected,
+.permissionPicker,
+.modelPicker,
+.modelPicker.selected,
+.workspacePicker {
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--border-muted);
+}
+
+.connectorPicker:hover,
+.permissionPicker:hover,
+.modelPicker:hover,
+.workspacePicker:hover {
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px transparent;
 }
 
 .modelMenu {
