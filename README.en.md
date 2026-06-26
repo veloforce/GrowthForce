@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="docs/logo.png" width="120" alt="GrowthForce Logo" />
-</p>
 
 <h1 align="center">GrowthForce</h1>
 
@@ -167,11 +164,9 @@ cd GrowthForce
 # Install dependencies
 npm install
 
-# Start dev environment (wraps scripts/dev.sh)
+# Start dev environment
 npm run dev
 
-# Equivalent direct script
-bash scripts/dev.sh
 
 # Build
 npm run build

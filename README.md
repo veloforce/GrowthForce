@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="docs/logo.png" width="120" alt="GrowthForce Logo" />
-</p>
 
 <h1 align="center">GrowthForce</h1>
 
@@ -167,11 +164,8 @@ cd GrowthForce
 # 安装依赖
 npm install
 
-# 启动开发环境（内部调用 scripts/dev.sh）
+# 启动开发环境
 npm run dev
-
-# 等价的直接脚本方式
-bash scripts/dev.sh
 
 # 构建
 npm run build
