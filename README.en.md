@@ -1,92 +1,236 @@
-# GrowthForce
+<p align="center">
+  <img src="docs/design/logo.png" width="120" alt="GrowthForce Logo" />
+</p>
 
-> 中文版: [README.md](./README.md)
+<h1 align="center">GrowthForce</h1>
 
-GrowthForce is a local-first AI content operations workspace for creators, content teams, and partners who want to use AI to improve content production, publishing workflows, and performance review.
+<p align="center">
+  <strong>AI-Powered Multi-Account Content Operations Workspace</strong><br/>
+  One-click install. Zero config. No Codex required.
+</p>
 
-It is not just a writing assistant, and it is not a single-purpose automation script. GrowthForce turns content operations into an extensible Agent workflow: research, topic strategy, content creation, platform adaptation, publishing assistance, data collection, and long-term learning.
+<p align="center">
+  <a href="./LICENSE">
+    <img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License" />
+  </a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey.svg" alt="Platform" />
+  <img src="https://img.shields.io/badge/version-0.1.10-green.svg" alt="Version" />
+</p>
 
-## Core Capabilities
+<p align="center">
+  <a href="./README.md">中文</a> · <a href="#quick-start">Quick Start</a> · <a href="#core-advantages">Core Advantages</a> · <a href="#vision--collaboration">Vision & Collaboration</a>
+</p>
 
-- **Research and topic strategy**: Use account positioning, trends, competitors, and user materials to generate platform-aware content directions.
-- **Multi-platform content production**: Support workflows for Xiaohongshu, WeChat Official Accounts, and similar content platforms, including drafts, publishing packages, cover ideas, image directions, and platform-specific formatting.
-- **Operational learning loop**: Build a repeatable loop around `profile → content production → data collection → review`, so historical performance and user preferences can become reusable playbooks.
-- **Human-in-the-loop publishing**: Keep external publishing and real interaction actions reviewable and user-confirmed, which is important for stable operational workflows.
-- **Local-first workspace**: Keep user materials, settings, conversations, and runtime data on the local machine by default.
-- **Extensible Agent architecture**: Use Skills, Tools, and Connectors to extend new platforms, operational stages, and team-specific workflows.
+---
 
-## Who It Is For
+## Why GrowthForce
 
-- Individual creators who want AI to support daily content operations.
-- Content teams producing Xiaohongshu, WeChat Official Account, or similar platform content.
-- Partners exploring AI Agent workflows, content automation, and review systems.
-- Teams that need a desktop workspace for materials, conversations, tasks, and platform workflows.
+Most AI writing tools only solve one problem: "generate a piece of content." But the real challenges in content operations are:
 
-## What Makes GrowthForce Different
+- Managing multiple accounts simultaneously, each with different positioning
+- Repeating the same daily loop: find trends → write → publish → check data
+- No way to accumulate experience — every creation starts from scratch
 
-### From Content Generation To Operational Loops
+GrowthForce is not another AI writing assistant. It's a **complete content operations OS** — from multi-account management to automated publishing, from data collection to AI-powered review, all in one desktop app.
 
-Most AI writing tools stop at one-off output. GrowthForce focuses on the full content operations loop: research, creation, publishing assistance, collection, review, and reusable learning. Each content run can become context for the next one.
+---
 
-### From Chat To Executable Workspace
+## Core Advantages
 
-GrowthForce packages Agents, browser capabilities, platform connectors, local data, and scheduled tasks into one desktop application. Users can prepare content, adapt it for platforms, and review performance in the same workspace.
+### Multi-Account Matrix Management
 
-### From Fixed Flow To Extensible Capability System
+Operate multiple Xiaohongshu and WeChat Official Accounts simultaneously. Each account maintains its own positioning, persona, content strategy, and operational playbook. No more switching between browser windows.
 
-GrowthForce organizes capabilities into three layers:
+### Fully Automated Operations Loop
 
-- **Agent**: Understands user goals and coordinates work.
-- **Skill**: Defines the SOP, boundaries, and collaboration rules for each stage.
-- **Tool / Connector**: Provides atomic capabilities and platform workflow integration.
-
-This structure lets GrowthForce keep the core experience stable while gradually adding more platforms, internal tools, and operational methods.
-
-## Architecture Overview
-
-GrowthForce is a cross-platform desktop application with a local-first multi-process architecture:
-
-```text
-Desktop App
-├─ Renderer: UI, conversation workspace, tasks, and result display
-├─ Main Process: windows, sessions, data, scheduling, and platform runtimes
-├─ Agent Process: AI Agent execution, Skill orchestration, and tool calls
-├─ Skills: research, creation, publishing, collection, review, and other stages
-├─ Tools: file, content analysis, image, browser, automation, and other atomic capabilities
-└─ Connectors: platform workflows such as Xiaohongshu and WeChat Official Accounts
+```
+Account Positioning → Trend Research → Topic Planning → Content Generation → Platform Adaptation → Publishing → Data Collection → AI Review → Strategy Update
 ```
 
-The goal is to keep long-running work from blocking the desktop app while maintaining clear boundaries between platform capabilities, content capabilities, and local data.
+Once you set up account positioning, GrowthForce automatically executes the full operations pipeline. Scheduled tasks drive data collection and review — every publish's performance automatically feeds into the next creation cycle.
 
-## Platforms And Distribution
+### AI-Powered Review
 
-GrowthForce targets:
+More than a data dashboard. The AI Agent automatically analyzes each post's performance (reads, likes, saves, comments), compares drafts vs. final versions, identifies effective patterns, and updates the account's long-term operational playbook. Single-post noise won't distort judgment — only patterns validated across multiple posts get promoted to active rules.
 
-- macOS
-- Windows
+### One-Click Install, Ready to Use
 
-Installers can be distributed through a public Release page. If the source code is not public, a separate public release repository is recommended for installers, changelogs, and product documentation instead of exposing a private source repository.
+Download DMG / EXE, double-click to install, open and go.
 
-Platform capabilities may evolve by version. Refer to the current release notes for the exact supported feature set.
+- **No Codex installation needed** — Agent runtime is built-in
+- **No workflow configuration needed** — Pre-built content operations Skills and Tools included
+- **No environment setup needed** — Xiaohongshu connector, browser engine, database all bundled
+- **No programming experience needed** — Conversational interface, just talk naturally
 
-## Usage Boundaries
+---
 
-GrowthForce is designed to help users operate content more efficiently. It does not replace user judgment about content quality, compliance, or platform rules.
+## Quick Start
 
-When using GrowthForce:
+### 1. Download & Install
 
-- Review content before publishing externally.
-- Follow the rules of each platform for publishing and interactions.
-- Do not use AI to fabricate data, cases, policies, sources, or personal experiences.
-- Manage account, material, and configuration data responsibly.
+Go to [Releases](https://github.com/veloforce/GrowthForce/releases/) to download the latest version:
 
-## Current Status
+| Platform | File |
+|----------|------|
+| macOS (Intel) | `GrowthForce-x.x.x-mac-x64.dmg` |
+| macOS (Apple Silicon) | `GrowthForce-x.x.x-mac-arm64.dmg` |
+| Windows | `GrowthForce-x.x.x-win-x64.exe` |
 
-GrowthForce is under active development, with ongoing work focused on:
+### 2. Set Up Your Account
 
-- A more complete content operations loop.
-- More stable platform connectors.
-- Stronger Skill extensibility.
-- Clearer scheduled task and review workflows.
-- A better desktop workspace for individual creators and teams.
+Open the app and create your first operations account:
+- Define account positioning (target audience, content domain, tone of voice)
+- Connect platform (scan QR to log in Xiaohongshu / authorize WeChat Official Account)
 
+### 3. Start Operating
+
+Just tell the AI what you want to do:
+
+> "Research the latest Xiaohongshu trends about AI tools and give me 3 topic ideas"
+
+> "Write a Xiaohongshu post based on the second topic, keep it casual with engagement hooks"
+
+> "Publish to my Xiaohongshu account, schedule for 6pm tomorrow"
+
+> "How did last week's content perform? Which post did best?"
+
+---
+
+## Feature Overview
+
+| Stage | Capability | Status |
+|-------|-----------|--------|
+| Account Positioning | Multi-account management, persona, strategy differentiation | ✅ |
+| Trend Research | Platform trend tracking, competitor analysis, actionable angles | ✅ |
+| Content Creation | Xiaohongshu posts, WeChat long-form articles, multi-platform adaptation | ✅ |
+| Visual Packaging | Cover copy, image direction, layout optimization | ✅ |
+| Publish Management | One-click publish, scheduled publish, multi-account distribution | ✅ |
+| Data Collection | Auto-scheduled collection of reads/likes/saves/comments | ✅ |
+| AI Review | Performance attribution, pattern recognition, playbook accumulation | ✅ |
+| Engagement Ops | Comment replies, likes, saves | ✅ |
+| Automation Tasks | Scheduled collection, scheduled review, scheduled publishing | ✅ |
+| WeChat Connector | Draft box push, article formatting | ✅ |
+| Xiaohongshu Connector | Post publishing, data collection, engagement | ✅ |
+
+---
+
+## Architecture
+
+```
+GrowthForce Desktop
+├─ Renderer          UI · Conversation workspace · Task management
+├─ Main Process      Windows · Sessions · Data · Scheduling
+├─ Agent Runtime     AI Agent execution · Skill orchestration
+│   ├─ Skills        Research / Creation / Publishing / Collection / Review
+│   └─ Tools         File · Image · Browser · Automation · Data
+└─ Connectors        Xiaohongshu · WeChat (extensible)
+```
+
+**Design Principles:**
+- **Local-first** — Data stored locally, privacy under your control
+- **Agent architecture** — Three-layer decoupling: Agent understands goals → Skill defines SOP → Tool executes atomic operations
+- **Human-in-the-loop** — External publishing and engagement require user confirmation, suitable for teams that need quality control
+
+---
+
+## Vision & Collaboration
+
+### Our Vision
+
+**Give every content creator their own AI operations team.**
+
+Content operations shouldn't be repetitive labor. Research, writing, publishing, reviewing data, summarizing learnings — 80% of this work can be handled by AI Agents, while creators focus on decisions and quality control.
+
+GrowthForce aims to become the infrastructure for content operations: open-source, extensible, community-driven.
+
+### Collaboration Opportunities
+
+We welcome collaboration in the following areas:
+
+| Area | Description |
+|------|-------------|
+| **Platform Connectors** | Integrate more content platforms (Douyin, Bilibili, Twitter/X, LinkedIn, etc.) |
+| **Skill Contributions** | Contribute domain-specific operations methodologies (e-commerce, knowledge products, local business, etc.) |
+| **AI Enhancement** | Better content understanding, data analysis, trend prediction |
+| **Business Partnerships** | MCN agencies, operations service providers, SaaS platform integrations |
+| **Internationalization** | Multi-language support, international platform adaptation |
+
+### Why Open Source
+
+- Content operations methodologies should be co-built and shared, not locked inside a single product
+- Open source lets users audit Agent behavior, ensuring transparency and control
+- Community-contributed connectors and Skills benefit all users
+
+---
+
+## Development
+
+```bash
+# Clone the repo
+git clone https://github.com/veloforce/GrowthForce.git
+cd GrowthForce
+
+# Install dependencies
+npm install
+
+# Start dev environment
+npm run dev
+
+# Build
+npm run build
+
+# Package
+npm run package:mac        # macOS universal
+npm run package:mac:arm64  # Apple Silicon
+npm run package:win        # Windows
+```
+
+### Project Structure
+
+```
+src/
+├── main/          Electron main process
+├── renderer/      React renderer process
+├── agent/         Agent runtime
+├── preload/       Preload scripts
+└── shared/        Shared types and utilities
+
+resources/
+├── agents/        Agent definitions
+├── skills/        Skill definitions (SOP and orchestration)
+├── tools/         Tool implementations (atomic capabilities)
+├── connectors/    Platform connectors
+└── prompts/       Prompt templates
+```
+
+### Tech Stack
+
+- **Desktop Framework**: Electron
+- **Frontend**: React + Vite + TypeScript
+- **AI Runtime**: Claude Agent SDK
+- **Data Storage**: sql.js (SQLite in WASM)
+- **Automation**: Built-in browser engine + CDP
+- **Platform Connection**: Python sidecar (Xiaohongshu)
+
+---
+
+## Roadmap
+
+- [ ] More platform connectors (Douyin, Bilibili)
+- [ ] Multi-account parallel operations dashboard
+- [ ] Content calendar and scheduling visualization
+- [ ] Skill marketplace (community-contributed operations methodologies)
+- [ ] Team collaboration mode
+- [ ] Mobile companion app (approval, quick publish)
+
+---
+
+## License
+
+[Apache License 2.0](./LICENSE)
+
+---
+
+<p align="center">
+  <strong>Turn content operations from repetitive labor into creative decision-making with AI.</strong>
+</p>
