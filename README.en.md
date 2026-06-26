@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/design/logo.png" width="120" alt="GrowthForce Logo" />
+  <img src="docs/logo.png" width="120" alt="GrowthForce Logo" />
 </p>
 
 <h1 align="center">GrowthForce</h1>
@@ -66,23 +66,17 @@ Download DMG / EXE, double-click to install, open and go.
 
 ## Quick Start
 
-### 1. Download & Install
+After opening the app, setup only takes two steps:
 
-Go to [Releases](https://github.com/veloforce/GrowthForce/releases/) to download the latest version:
+### 1. Configure Your AI Model
 
-| Platform | File |
-|----------|------|
-| macOS (Intel) | `GrowthForce-x.x.x-mac-x64.dmg` |
-| macOS (Apple Silicon) | `GrowthForce-x.x.x-mac-arm64.dmg` |
-| Windows | `GrowthForce-x.x.x-win-x64.exe` |
+Enter the Claude Code-compatible model and API configuration, such as model name, API key, and base URL.
 
-### 2. Set Up Your Account
+### 2. Connect Your Account
 
-Open the app and create your first operations account:
-- Define account positioning (target audience, content domain, tone of voice)
-- Connect platform (scan QR to log in Xiaohongshu / authorize WeChat Official Account)
+Connect the platform account you want to operate (Xiaohongshu / WeChat Official Account), then start using GrowthForce.
 
-### 3. Start Operating
+### Start Operating
 
 Just tell the AI what you want to do:
 
@@ -173,8 +167,11 @@ cd GrowthForce
 # Install dependencies
 npm install
 
-# Start dev environment
+# Start dev environment (wraps scripts/dev.sh)
 npm run dev
+
+# Equivalent direct script
+bash scripts/dev.sh
 
 # Build
 npm run build
