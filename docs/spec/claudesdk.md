@@ -27,10 +27,10 @@ SDK 嵌入场景没有 Claude CLI 自带的 TUI，所有会中断 agent loop 的
     `updatedInput.questions` 和 `updatedInput.response`，不再同时回传 per-question answers。
   - `query` options 显式设置 `toolConfig.askUserQuestion.previewFormat = "markdown"`；
     Renderer 只按安全 markdown/plain text 渲染 preview，不启用 HTML。
-  - 其他工具审批提供“允许本次”“始终允许”“拒绝”“建议替代方案”四个动作。
+  - 其他工具审批提供“允许本次”“始终允许”“拒绝”“替代方案”四个动作。
     “允许本次”透传原始 `input`；“始终允许”仅在 SDK `suggestions` 中存在
     `destination: "localSettings"` 项时展示，并将这些 suggestions 回传到 `updatedPermissions`。
-  - 用户拒绝或建议替代方案时返回 `behavior: "deny"`，并把用户填写的原因/建议作为
+  - 用户拒绝或提交替代方案时返回 `behavior: "deny"`，并把用户填写的原因/建议作为
     `message` 交给 Claude 重新规划。
   - 本项目不支持 `approve with changes`，不提供工具入参 JSON 编辑。
   - 本项目不支持 `redirect entirely`。

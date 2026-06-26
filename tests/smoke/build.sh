@@ -247,7 +247,7 @@ for (const rendererExpected of [
   "允许本次",
   "始终允许",
   "拒绝原因",
-  "建议替代方案",
+  "替代方案",
   "MarkdownPreview",
   "getRememberPermissionSuggestions"
 ]) {
@@ -2186,8 +2186,8 @@ try {
     throw new Error("Expected runtime link for builtin skill to point at writable user resource copy");
   }
   const initialSettings = readSettings(settings);
-  if (!fs.existsSync(settings) || initialSettings.chat.permissionMode !== "auto" || initialSettings.skills.disabled.length !== 0) {
-    throw new Error(`Expected settings.yml defaults with auto permission and empty disabled list, got ${JSON.stringify(initialSettings)}`);
+  if (!fs.existsSync(settings) || initialSettings.chat.permissionMode !== "bypassPermissions" || initialSettings.skills.disabled.length !== 0) {
+    throw new Error(`Expected settings.yml defaults with full access permission and empty disabled list, got ${JSON.stringify(initialSettings)}`);
   }
   if (!initialSettings.skills.installed.gzh_content_gen || !initialSettings.skills.installed.topic_strategy) {
     throw new Error(`Expected source skills to be reconciled into settings installed map, got ${JSON.stringify(initialSettings)}`);
@@ -2215,7 +2215,7 @@ try {
   if (!readSettings(settings).skills.installed.gzh_content_gen) {
     throw new Error("Expected disabling a skill to preserve installed settings entry");
   }
-  if (readSettings(settings).chat.permissionMode !== "auto") {
+  if (readSettings(settings).chat.permissionMode !== "bypassPermissions") {
     throw new Error("Expected disabling a skill to preserve chat permission setting");
   }
   let listed = listSkills(paths).skills.find((skill) => skill.name === "gzh_content_gen");
@@ -2371,7 +2371,7 @@ const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentstudio-settings-"));
 const settings = path.join(tempDir, "settings.yml");
 try {
   let current = readSettings(settings);
-  if (current.ui.themeMode !== "system" || current.chat.permissionMode !== "auto" || Object.keys(current.skills.installed).length !== 0) {
+  if (current.ui.themeMode !== "system" || current.chat.permissionMode !== "bypassPermissions" || Object.keys(current.skills.installed).length !== 0) {
     throw new Error(`Expected missing settings to use defaults, got ${JSON.stringify(current)}`);
   }
 
@@ -2384,7 +2384,7 @@ try {
     }
   }), "utf8");
   current = readSettings(settings);
-  if (current.ui.themeMode !== "system" || current.chat.permissionMode !== "auto" || !current.skills.installed.topic_strategy) {
+  if (current.ui.themeMode !== "system" || current.chat.permissionMode !== "bypassPermissions" || !current.skills.installed.topic_strategy) {
     throw new Error(`Expected old settings to merge chat defaults, got ${JSON.stringify(current)}`);
   }
 
@@ -2414,7 +2414,7 @@ try {
 
   fs.writeFileSync(settings, "ui:\n  themeMode: invalid\nchat:\n  permissionMode: invalid\n", "utf8");
   current = readSettings(settings);
-  if (current.ui.themeMode !== "system" || current.chat.permissionMode !== "auto") {
+  if (current.ui.themeMode !== "system" || current.chat.permissionMode !== "bypassPermissions") {
     throw new Error(`Expected invalid theme and permission modes to fall back to defaults, got ${JSON.stringify(current)}`);
   }
 } finally {

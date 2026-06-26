@@ -126,7 +126,7 @@ test("renderer handles normal tool permission actions", async ({ page }) => {
   await page.getByRole("button", { name: "提交" }).click();
 
   await emitToolRequest({ rpcId: "alternative" });
-  await page.getByRole("button", { name: "建议替代方案" }).click();
+  await page.getByRole("button", { name: "替代方案" }).click();
   await expect(page.getByRole("button", { name: "提交" })).toBeDisabled();
   await page.getByPlaceholder("说明你希望小G改用什么做法").fill("先读取文件再决定是否写入");
   await page.getByRole("button", { name: "提交" }).click();

@@ -14,7 +14,7 @@ export const defaultSettings: AgentStudioSettings = {
     themeMode: "system"
   },
   chat: {
-    permissionMode: "auto"
+    permissionMode: "bypassPermissions"
   },
   connector: {
     xhs: {

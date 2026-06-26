@@ -274,7 +274,7 @@ export function App() {
   const [permissionDraft, setPermissionDraft] = useState<PermissionDraft>(() => createPermissionDraft());
   const [permissionSubmitting, setPermissionSubmitting] = useState(false);
   const [input, setInput] = useState("");
-  const [permissionMode, setPermissionMode] = useState<ChatPermissionMode>("auto");
+  const [permissionMode, setPermissionMode] = useState<ChatPermissionMode>("bypassPermissions");
   const [attachments, setAttachments] = useState<LocalAttachment[]>([]);
   const [selectedPromptSkills, setSelectedPromptSkills] = useState<PromptSkillReference[]>([]);
   const [connectorState, setConnectorState] = useState<ConnectorState | null>(null);
@@ -412,7 +412,7 @@ export function App() {
     void window.agentStudio.bootstrap().then((data: BootstrapState) => {
       setBootstrap(data);
       setSessions(data.sessions);
-      setPermissionMode(data.settings?.chat?.permissionMode ?? "auto");
+      setPermissionMode(data.settings?.chat?.permissionMode ?? "bypassPermissions");
       setThemeState(data.theme ?? resolveLocalTheme(normalizeThemeMode(data.settings?.ui?.themeMode)));
       setProviderDraft(data.config?.provider ?? emptyProviderDraft);
       setModelProviderSettings(data.modelProviderSettings ?? emptyModelProviderSettings);
@@ -4094,7 +4094,7 @@ function PermissionRequestCard({
             </button>
             <button className="secondaryButton" type="button" onClick={() => onDraftChange({ ...draft, mode: "suggest_alternative", message: "" })} disabled={submitting}>
               <Lightbulb size={15} />
-              建议替代方案
+              替代方案
             </button>
             {canRemember ? (
               <button className="secondaryButton" type="button" onClick={() => onRespond("allow_remember")} disabled={submitting}>
