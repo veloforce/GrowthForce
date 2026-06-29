@@ -15,8 +15,18 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">中文</a> · <a href="#quick-start">Quick Start</a> · <a href="#core-advantages">Core Advantages</a> · <a href="#vision--collaboration">Vision & Collaboration</a>
+  <a href="./README.md">中文</a> · <a href="#product-screenshots">Product Screenshots</a> · <a href="#quick-start">Quick Start</a> · <a href="#core-advantages">Core Advantages</a> · <a href="#vision--collaboration">Vision & Collaboration</a>
 </p>
+
+---
+
+## Product Screenshots
+
+![GrowthForce home conversation workspace](./docs/image/home.png)
+
+![GrowthForce plugins and skills management](./docs/image/20260620132106.jpg)
+
+![GrowthForce automation task configuration](./docs/image/automation.png)
 
 ---
 

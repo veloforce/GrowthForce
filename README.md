@@ -15,8 +15,18 @@
 </p>
 
 <p align="center">
-  <a href="./README.en.md">English</a> · <a href="#快速开始">快速开始</a> · <a href="#核心优势">核心优势</a> · <a href="#愿景与合作">愿景与合作</a>
+  <a href="./README.en.md">English</a> · <a href="#产品截图">产品截图</a> · <a href="#快速开始">快速开始</a> · <a href="#核心优势">核心优势</a> · <a href="#愿景与合作">愿景与合作</a>
 </p>
+
+---
+
+## 产品截图
+
+![GrowthForce 首页对话工作台](./docs/image/home.png)
+
+![GrowthForce 插件和技能管理](./docs/image/20260620132106.jpg)
+
+![GrowthForce 自动化任务配置](./docs/image/automation.png)
 
 ---
 
