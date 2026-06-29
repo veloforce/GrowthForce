@@ -256,11 +256,12 @@ export class AppDatabase {
     return rows[0] ? mapAutomationRun(rows[0]) : null;
   }
 
-  createAutomationRun(input: { task: AutomationTask; scheduledAt: string }): AutomationRun {
+  createAutomationRun(input: { task: AutomationTask; scheduledAt: string; status?: AutomationRunStatus }): AutomationRun {
     const now = new Date().toISOString();
+    const status = input.status ?? "running";
     this.db.run(
-      "INSERT INTO automation_runs (task_id, task_name_snapshot, scheduled_at, status, attempt_count, max_attempts, created_at, updated_at) VALUES (?, ?, ?, 'running', 0, ?, ?, ?)",
-      [input.task.id, input.task.name, input.scheduledAt, input.task.maxRetries + 1, now, now]
+      "INSERT INTO automation_runs (task_id, task_name_snapshot, scheduled_at, status, attempt_count, max_attempts, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, ?)",
+      [input.task.id, input.task.name, input.scheduledAt, status, input.task.maxRetries + 1, now, now]
     );
     this.persist();
     const id = Number(this.selectRows("SELECT MAX(id) AS id FROM automation_runs")[0]?.id);
@@ -290,25 +291,43 @@ export class AppDatabase {
     this.persist();
   }
 
+  scheduleAutomationRunResourceWait(id: number, input: { nextCheckAt: string; errorMessage: string }): void {
+    const now = new Date().toISOString();
+    this.db.run("UPDATE automation_runs SET status = 'waiting_resource', next_retry_at = ?, error_message = ?, updated_at = ? WHERE id = ?", [input.nextCheckAt, input.errorMessage, now, id]);
+    this.persist();
+  }
+
+  hasOpenAutomationRunForTask(taskId: number): boolean {
+    const rows = this.selectRows(
+      "SELECT id FROM automation_runs WHERE task_id = ? AND status IN ('running', 'retrying', 'waiting_resource') LIMIT 1",
+      [taskId]
+    );
+    return rows.length > 0;
+  }
+
   listDueAutomationTasks(nowIso: string): AutomationTask[] {
     return this.selectRows("SELECT * FROM automation_tasks WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY next_run_at ASC", [nowIso]).map(mapAutomationTask);
   }
 
-  listDueAutomationRetries(nowIso: string): AutomationRun[] {
+  listDueAutomationRunContinuations(nowIso: string): AutomationRun[] {
     return this.selectRows(`
       SELECT runs.*, COALESCE(tasks.name, runs.task_name_snapshot, '已删除任务') AS task_name
       FROM automation_runs runs
       LEFT JOIN automation_tasks tasks ON tasks.id = runs.task_id
-      WHERE runs.status = 'retrying' AND runs.next_retry_at IS NOT NULL AND runs.next_retry_at <= ?
-      ORDER BY runs.next_retry_at ASC
+      WHERE runs.status IN ('retrying', 'waiting_resource') AND runs.next_retry_at IS NOT NULL AND runs.next_retry_at <= ?
+      ORDER BY runs.next_retry_at ASC, runs.created_at ASC
     `, [nowIso]).map(mapAutomationRun);
+  }
+
+  listDueAutomationRetries(nowIso: string): AutomationRun[] {
+    return this.listDueAutomationRunContinuations(nowIso).filter((run) => run.status === "retrying");
   }
 
   getNextAutomationCandidate(): { at: string; kind: "task" | "retry" } | null {
     const rows = this.selectRows(`
       SELECT next_run_at AS at, 'task' AS kind FROM automation_tasks WHERE enabled = 1 AND next_run_at IS NOT NULL
       UNION ALL
-      SELECT next_retry_at AS at, 'retry' AS kind FROM automation_runs WHERE status = 'retrying' AND next_retry_at IS NOT NULL
+      SELECT next_retry_at AS at, 'retry' AS kind FROM automation_runs WHERE status IN ('retrying', 'waiting_resource') AND next_retry_at IS NOT NULL
       ORDER BY at ASC
       LIMIT 1
     `);
@@ -321,6 +340,15 @@ export class AppDatabase {
     if (rows.length === 0) return 0;
     const now = new Date().toISOString();
     this.db.run("UPDATE automation_runs SET status = 'failed', ended_at = ?, next_retry_at = NULL, error_message = '应用关闭期间错过重试', updated_at = ? WHERE status = 'retrying' AND next_retry_at IS NOT NULL AND next_retry_at < ?", [now, now, nowIso]);
+    this.persist();
+    return rows.length;
+  }
+
+  markOverdueAutomationResourceWaitsFailed(nowIso: string): number {
+    const rows = this.selectRows("SELECT id FROM automation_runs WHERE status = 'waiting_resource' AND next_retry_at IS NOT NULL AND next_retry_at < ?", [nowIso]);
+    if (rows.length === 0) return 0;
+    const now = new Date().toISOString();
+    this.db.run("UPDATE automation_runs SET status = 'failed', ended_at = ?, next_retry_at = NULL, error_message = '应用关闭期间错过账号资源等待', updated_at = ? WHERE status = 'waiting_resource' AND next_retry_at IS NOT NULL AND next_retry_at < ?", [now, now, nowIso]);
     this.persist();
     return rows.length;
   }
@@ -386,7 +414,7 @@ export class AppDatabase {
         scheduled_at TEXT NOT NULL,
         started_at TEXT,
         ended_at TEXT,
-        status TEXT NOT NULL CHECK(status IN ('running', 'retrying', 'succeeded', 'failed')),
+        status TEXT NOT NULL CHECK(status IN ('running', 'waiting_resource', 'retrying', 'succeeded', 'failed')),
         attempt_count INTEGER NOT NULL DEFAULT 0,
         max_attempts INTEGER NOT NULL DEFAULT 1,
         next_retry_at TEXT,
@@ -397,6 +425,9 @@ export class AppDatabase {
       CREATE INDEX IF NOT EXISTS idx_automation_runs_created_at ON automation_runs(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_automation_runs_next_retry_at ON automation_runs(status, next_retry_at);
     `);
+    this.ensureAutomationRunsStatusConstraint();
+    this.db.run("CREATE INDEX IF NOT EXISTS idx_automation_runs_created_at ON automation_runs(created_at DESC)");
+    this.db.run("CREATE INDEX IF NOT EXISTS idx_automation_runs_next_retry_at ON automation_runs(status, next_retry_at)");
     this.ensureColumn("sessions", "local_session_id", "TEXT");
     this.ensureColumn("sessions", "agent_name", "TEXT NOT NULL DEFAULT 'orchestrator'");
     this.ensureColumn("sessions", "origin", "TEXT NOT NULL DEFAULT 'manual'");
@@ -426,6 +457,42 @@ export class AppDatabase {
     this.db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_connector_accounts_platform_profile_key ON connector_accounts(platform, profile_key)");
     this.db.run("CREATE UNIQUE INDEX IF NOT EXISTS idx_connector_accounts_platform_account_id ON connector_accounts(platform, account_id) WHERE account_id IS NOT NULL");
     this.db.run("CREATE INDEX IF NOT EXISTS idx_connector_accounts_platform_updated_at ON connector_accounts(platform, updated_at DESC)");
+  }
+
+  private ensureAutomationRunsStatusConstraint(): void {
+    const row = this.selectRows("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'automation_runs'")[0];
+    const sql = typeof row?.sql === "string" ? row.sql : "";
+    if (sql.includes("waiting_resource")) return;
+    this.db.run("ALTER TABLE automation_runs RENAME TO automation_runs_old_status_check");
+    this.db.run(`
+      CREATE TABLE automation_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        task_id INTEGER NOT NULL,
+        task_name_snapshot TEXT NOT NULL,
+        session_id INTEGER,
+        scheduled_at TEXT NOT NULL,
+        started_at TEXT,
+        ended_at TEXT,
+        status TEXT NOT NULL CHECK(status IN ('running', 'waiting_resource', 'retrying', 'succeeded', 'failed')),
+        attempt_count INTEGER NOT NULL DEFAULT 0,
+        max_attempts INTEGER NOT NULL DEFAULT 1,
+        next_retry_at TEXT,
+        error_message TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    `);
+    this.db.run(`
+      INSERT INTO automation_runs (
+        id, task_id, task_name_snapshot, session_id, scheduled_at, started_at, ended_at,
+        status, attempt_count, max_attempts, next_retry_at, error_message, created_at, updated_at
+      )
+      SELECT
+        id, task_id, task_name_snapshot, session_id, scheduled_at, started_at, ended_at,
+        status, attempt_count, max_attempts, next_retry_at, error_message, created_at, updated_at
+      FROM automation_runs_old_status_check
+    `);
+    this.db.run("DROP TABLE automation_runs_old_status_check");
   }
 
   private persist(): void {

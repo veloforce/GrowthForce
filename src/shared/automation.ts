@@ -107,6 +107,7 @@ export function formatAutomationSchedule(type: AutomationScheduleType, config: A
 export function formatAutomationStatus(status: string): string {
   if (status === "succeeded") return "成功";
   if (status === "failed") return "失败";
+  if (status === "waiting_resource") return "等待账号空闲";
   if (status === "retrying") return "等待重试";
   return "运行中";
 }

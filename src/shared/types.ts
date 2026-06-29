@@ -5,7 +5,7 @@ export type ResolvedTheme = "light" | "dark";
 export type SessionOrigin = "manual" | "automation";
 export type AutomationScheduleType = "once" | "interval" | "hourly" | "daily" | "weekday" | "weekly" | "monthly";
 export type AutomationIntervalUnit = "minute" | "hour" | "day";
-export type AutomationRunStatus = "running" | "retrying" | "succeeded" | "failed";
+export type AutomationRunStatus = "running" | "waiting_resource" | "retrying" | "succeeded" | "failed";
 export type ConnectorPlatform = "xhs" | "wechat" | "douyin";
 export type ConnectorAccountStatus = "unauthorized" | "authorizing" | "authorized" | "needs_refresh" | "error";
 

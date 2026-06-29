@@ -3342,7 +3342,8 @@ button {
   background: #ffe7e7;
 }
 
-.runStatus.retrying {
+.runStatus.retrying,
+.runStatus.waiting_resource {
   color: #7d551b;
   background: #fff2d8;
 }
@@ -4732,7 +4733,8 @@ select:focus-visible {
   background: #f6ead0;
 }
 
-.runStatus.retrying {
+.runStatus.retrying,
+.runStatus.waiting_resource {
   color: #73501b;
   background: #fff0d4;
 }
@@ -5273,7 +5275,8 @@ select:disabled {
   box-shadow: none;
 }
 
-.runStatus.retrying {
+.runStatus.retrying,
+.runStatus.waiting_resource {
   color: var(--status-retrying-text);
   background: var(--status-retrying-bg);
   box-shadow: none;

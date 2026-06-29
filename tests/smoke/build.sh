@@ -791,7 +791,7 @@ const os = require("os");
 const path = require("path");
 const { AppDatabase } = require("./dist/main/database.js");
 const { resolveAutomationToolAttachments, resolveAutomationToolSkills, validateAutomationAttachments, validateAutomationSelectedSkills } = require("./dist/main/automation-tool.js");
-const { calculateAutomationDispatchPlan, calculateNextRunAt, formatAutomationSchedule, normalizeAutomationTaskInput } = require("./dist/shared/automation.js");
+const { calculateAutomationDispatchPlan, calculateNextRunAt, formatAutomationSchedule, formatAutomationStatus, normalizeAutomationTaskInput } = require("./dist/shared/automation.js");
 
 (async () => {
   const file = path.join(os.tmpdir(), `agentstudio-build-smoke-${Date.now()}.sqlite`);
@@ -901,6 +901,17 @@ const { calculateAutomationDispatchPlan, calculateNextRunAt, formatAutomationSch
   const automationTask = db.createAutomationTask(automationInput, "2026-06-03T00:00:00.000Z");
   if (automationTask.maxRuns !== 3 || automationTask.runCount !== 0 || automationTask.scheduleConfig.intervalUnit !== "day" || automationTask.connectorBindings.wechat.profileKey !== "wechat-local-a" || automationTask.selectedSkills[0].name !== "topic_strategy" || automationTask.attachments[0].path !== file) {
     throw new Error(`Expected automation task context to round-trip, got ${JSON.stringify(automationTask)}`);
+  }
+  const waitingRun = db.createAutomationRun({ task: automationTask, scheduledAt: "2026-06-03T00:00:00.000Z", status: "waiting_resource" });
+  db.scheduleAutomationRunResourceWait(waitingRun.id, { nextCheckAt: "2026-06-03T00:00:30.000Z", errorMessage: "账号忙" });
+  const dueContinuations = db.listDueAutomationRunContinuations("2026-06-03T00:00:31.000Z");
+  if (!db.hasOpenAutomationRunForTask(automationTask.id) || dueContinuations[0]?.status !== "waiting_resource" || dueContinuations[0]?.attemptCount !== 0 || formatAutomationStatus("waiting_resource") !== "等待账号空闲") {
+    throw new Error(`Expected waiting_resource automation run to be open and due without consuming attempts, got ${JSON.stringify(dueContinuations[0])}`);
+  }
+  const missedResourceWaits = db.markOverdueAutomationResourceWaitsFailed("2026-06-03T00:00:31.000Z");
+  const failedWaitingRun = db.getAutomationRun(waitingRun.id);
+  if (missedResourceWaits !== 1 || failedWaitingRun?.status !== "failed" || failedWaitingRun.attemptCount !== 0 || failedWaitingRun.errorMessage !== "应用关闭期间错过账号资源等待") {
+    throw new Error(`Expected overdue waiting_resource run to fail without attempts, got ${JSON.stringify(failedWaitingRun)}`);
   }
   const firstDispatch = db.recordAutomationTaskDispatch(automationTask.id, "2026-06-05T00:00:00.000Z", true);
   const finalDispatch = db.recordAutomationTaskDispatch(automationTask.id, null, false);

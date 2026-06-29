@@ -34,6 +34,7 @@ const cancelledRequestIds = new Set<string>();
 const sessionRuntimeCache = new Map<number, RuntimeSessionState>();
 const supplementQueues = new Map<string, SupplementQueueState>();
 const automationRequests = new Map<string, AutomationRequestState>();
+const connectorResourceLocks = new Map<string, string>();
 const permissionRequests = new Map<string, {
   request: AgentPermissionRequest;
   resolve: (response: AgentPermissionResponse) => void;
@@ -41,6 +42,7 @@ const permissionRequests = new Map<string, {
 let automationTimer: NodeJS.Timeout | null = null;
 const xhsAuthCheckIntervalMs = 5 * 60 * 60 * 1000;
 const xhsAuthCheckRetryMs = 15 * 60 * 1000;
+const automationResourceCheckDelayMs = 2 * 60 * 1000;
 const xhsAuthCheckTimers = new Map<string, NodeJS.Timeout>();
 const xhsAuthChecksInFlight = new Set<string>();
 
@@ -1085,6 +1087,7 @@ function registerIpc(): void {
       wechatContext = input.wechatProfileKey ? ensureWechatContext(input.wechatProfileKey) : undefined;
     } catch (error) {
       xhsConnector.releaseRequest(request.requestId);
+      releaseConnectorResources(request.requestId);
       browserSessions.markIdle(session.id);
       db.updateStatus(session.id, "failed");
       refreshRuntimeSession(session.id);
@@ -1114,6 +1117,7 @@ function registerIpc(): void {
     if (Number.isFinite(sessionId)) db.updateStatus(sessionId, "cancelled");
     if (Number.isFinite(sessionId)) browserSessions.markIdle(sessionId);
     xhsConnector.releaseRequest(requestId);
+    releaseConnectorResources(requestId);
     const event: AgentEvent = {
       type: "error",
       requestId,
@@ -1325,7 +1329,14 @@ function getTargetXhsAccount(profileKey?: string): ConnectorAccount {
 async function ensureXhsContext(profileKey: string, requestId: string): Promise<NonNullable<AgentRunRequest["xhsConnector"]>> {
   const account = getTargetXhsAccount(profileKey);
   if (account.status !== "authorized") throw new Error("当前小红书账号未授权，请重新授权后再试");
-  return xhsConnector.ensureContext(account, requestId);
+  const resourceWait = reserveXhsConnectorResource(account.profileKey, requestId);
+  if (resourceWait) throw new Error(resourceWait.message);
+  try {
+    return await xhsConnector.ensureContext(account, requestId);
+  } catch (error) {
+    releaseConnectorResources(requestId);
+    throw error;
+  }
 }
 
 function ensureWechatContext(profileKey: string): NonNullable<AgentRunRequest["wechatConnector"]> {
@@ -1642,7 +1653,7 @@ function randomProfileKey(): string {
 }
 
 function assertXhsProfileUnlocked(profileKey: string): void {
-  if (xhsConnector.isLocked(profileKey)) throw new Error("其他任务正在运行");
+  if (xhsConnector.isLocked(profileKey) || connectorResourceLocks.has(xhsConnectorResourceKey(profileKey))) throw new Error("其他任务正在运行");
 }
 
 function sessionRuntimeCacheHasActiveRequest(): boolean {
@@ -2335,6 +2346,7 @@ function wireAgentEvents(): void {
         cancelledRequestIds.delete(event.requestId);
         xhsConnector.pruneProcessRegistry();
         xhsConnector.releaseRequest(event.requestId);
+        releaseConnectorResources(event.requestId);
         closeSupplementQueue(event.requestId, "cancelled event settled");
       }
       return;
@@ -2349,6 +2361,7 @@ function wireAgentEvents(): void {
       rejectPermissionRequestsForRequest(event.requestId, "任务已完成");
       xhsConnector.pruneProcessRegistry();
       xhsConnector.releaseRequest(event.requestId);
+      releaseConnectorResources(event.requestId);
       closeSupplementQueue(event.requestId, "done");
       db.completeSession(sessionId, {
         sdkSessionId: event.sdkSessionId,
@@ -2362,6 +2375,7 @@ function wireAgentEvents(): void {
       rejectPermissionRequestsForRequest(event.requestId, event.message || "任务已结束");
       xhsConnector.pruneProcessRegistry();
       xhsConnector.releaseRequest(event.requestId);
+      releaseConnectorResources(event.requestId);
       closeSupplementQueue(event.requestId, "error");
       db.updateStatus(sessionId, "failed");
       browserSessions.markIdle(sessionId);
@@ -2400,15 +2414,15 @@ function emitConnectorsChanged(reason: string): void {
 async function drainDueAutomationWork(): Promise<void> {
   const nowIso = new Date().toISOString();
   const dueTasks = db.listDueAutomationTasks(nowIso);
-  const dueRetries = db.listDueAutomationRetries(nowIso);
-  logEvent("main.automation.drain", { taskCount: dueTasks.length, retryCount: dueRetries.length });
+  const dueContinuations = db.listDueAutomationRunContinuations(nowIso);
+  logEvent("main.automation.drain", { taskCount: dueTasks.length, continuationCount: dueContinuations.length });
 
   for (const task of dueTasks) {
     dispatchAutomationTask(task);
   }
 
-  for (const run of dueRetries) {
-    dispatchAutomationRetry(run);
+  for (const run of dueContinuations) {
+    dispatchAutomationRunContinuation(run);
   }
 
   rescheduleAutomationTimer();
@@ -2416,30 +2430,65 @@ async function drainDueAutomationWork(): Promise<void> {
 
 function dispatchAutomationTask(task: AutomationTask): void {
   const scheduledAt = task.nextRunAt ?? new Date().toISOString();
+  if (db.hasOpenAutomationRunForTask(task.id)) {
+    const plan = calculateAutomationOverlapSkipPlan(task, scheduledAt);
+    db.updateAutomationTaskNextRunAt(task.id, plan.nextRunAt);
+    if (!plan.enabled) db.setAutomationTaskEnabled(task.id, false, null);
+    logEvent("main.automation.dispatch:skipOpenRun", { taskId: task.id, scheduledAt, nextRunAt: plan.nextRunAt });
+    emitAutomationChanged("task:skipOpenRun");
+    return;
+  }
   const run = db.createAutomationRun({ task, scheduledAt });
   const plan = calculateAutomationDispatchPlan(task, scheduledAt);
   const dispatchedTask = db.recordAutomationTaskDispatch(task.id, plan.nextRunAt, plan.enabled);
   startAutomationAttempt(dispatchedTask, run, 1);
 }
 
-function dispatchAutomationRetry(run: AutomationRun): void {
+function dispatchAutomationRunContinuation(run: AutomationRun): void {
   const task = db.getAutomationTask(run.taskId);
   if (!task) {
     db.completeAutomationRun(run.id, "failed", "自动化任务已删除，无法重试");
     emitAutomationChanged("run:retryTaskMissing");
     return;
   }
-  startAutomationAttempt(task, run, run.attemptCount + 1);
+  startAutomationAttempt(task, run, run.status === "waiting_resource" ? Math.max(1, run.attemptCount + 1) : run.attemptCount + 1);
+}
+
+function calculateAutomationOverlapSkipPlan(task: AutomationTask, scheduledAt: string): { enabled: boolean; nextRunAt: string | null } {
+  if (task.scheduleType === "once") return { enabled: false, nextRunAt: null };
+  if (task.maxRuns !== null && task.runCount >= task.maxRuns) return { enabled: false, nextRunAt: null };
+  const nextRunAt = calculateNextRunAt(task, new Date(scheduledAt));
+  if (!nextRunAt) return { enabled: false, nextRunAt: null };
+  return {
+    enabled: true,
+    nextRunAt
+  };
 }
 
 function startAutomationAttempt(task: AutomationTask, run: AutomationRun, attemptCount: number): void {
-  const session = db.createSession({
-    prompt: task.description,
-    workspacePath: task.workspacePath,
-    origin: "automation",
-    title: task.name
-  });
   const requestId = `automation:${run.id}:${attemptCount}:${Date.now()}`;
+  const resourceWait = reserveAutomationConnectorResources(task, requestId);
+  if (resourceWait) {
+    const nextCheckAt = new Date(Date.now() + automationResourceCheckDelayMs).toISOString();
+    db.scheduleAutomationRunResourceWait(run.id, { nextCheckAt, errorMessage: resourceWait.message });
+    logEvent("main.automation.dispatch:waitingResource", { requestId, runId: run.id, taskId: task.id, attemptCount, nextCheckAt, resource: resourceWait.resourceKey });
+    emitAutomationChanged("run:waitingResource");
+    rescheduleAutomationTimer();
+    return;
+  }
+
+  let session: SessionRecord;
+  try {
+    session = db.createSession({
+      prompt: task.description,
+      workspacePath: task.workspacePath,
+      origin: "automation",
+      title: task.name
+    });
+  } catch (error) {
+    releaseConnectorResources(requestId);
+    throw error;
+  }
   db.startAutomationRunAttempt(run.id, { sessionId: session.id, attemptCount });
   automationRequests.set(requestId, {
     runId: run.id,
@@ -2480,6 +2529,35 @@ function startAutomationAttempt(task: AutomationTask, run: AutomationRun, attemp
     });
   logEvent("main.automation.dispatch", { requestId, runId: run.id, taskId: task.id, sessionId: session.id, attemptCount });
   emitAutomationChanged("run:attemptStart");
+}
+
+function reserveAutomationConnectorResources(task: AutomationTask, requestId: string): { resourceKey: string; message: string } | null {
+  const xhsProfileKey = task.connectorBindings.xhs?.profileKey;
+  if (!xhsProfileKey) return null;
+  return reserveXhsConnectorResource(xhsProfileKey, requestId);
+}
+
+function reserveXhsConnectorResource(profileKey: string, requestId: string): { resourceKey: string; message: string } | null {
+  const resourceKey = xhsConnectorResourceKey(profileKey);
+  const owner = connectorResourceLocks.get(resourceKey);
+  if (owner && owner !== requestId) {
+    return { resourceKey, message: "小红书账号正在执行其他任务，等待账号空闲后继续" };
+  }
+  if (!owner && xhsConnector.isLocked(profileKey)) {
+    return { resourceKey, message: "小红书账号正在执行其他任务，等待账号空闲后继续" };
+  }
+  connectorResourceLocks.set(resourceKey, requestId);
+  return null;
+}
+
+function releaseConnectorResources(requestId: string): void {
+  for (const [resourceKey, owner] of [...connectorResourceLocks.entries()]) {
+    if (owner === requestId) connectorResourceLocks.delete(resourceKey);
+  }
+}
+
+function xhsConnectorResourceKey(profileKey: string): string {
+  return `xhs:${profileKey}`;
 }
 
 async function prepareAutomationRequest(task: AutomationTask, request: AgentRunRequest, session: SessionRecord): Promise<AgentRunRequest> {
@@ -2525,6 +2603,7 @@ function handleAutomationAgentEvent(event: AgentEvent): void {
   if (event.type === "done") {
     xhsConnector.pruneProcessRegistry();
     xhsConnector.releaseRequest(event.requestId);
+    releaseConnectorResources(event.requestId);
     automationRequests.delete(event.requestId);
     db.completeSession(state.sessionId, { sdkSessionId: event.sdkSessionId, jsonlPath: event.sdkSessionId ? getExistingSessionJsonlPath(state.sessionId, event.sdkSessionId) ?? undefined : undefined, status: "completed" });
     db.completeAutomationRun(state.runId, "succeeded");
@@ -2538,6 +2617,7 @@ function handleAutomationAgentEvent(event: AgentEvent): void {
   if (event.type === "error") {
     xhsConnector.pruneProcessRegistry();
     xhsConnector.releaseRequest(event.requestId);
+    releaseConnectorResources(event.requestId);
     automationRequests.delete(event.requestId);
     db.updateStatus(state.sessionId, "failed");
     browserSessions.markIdle(state.sessionId);
@@ -2558,6 +2638,7 @@ function handleAutomationAgentEvent(event: AgentEvent): void {
 function refreshAutomationSchedulesOnStartup(): void {
   const now = new Date();
   const missedRetries = db.markOverdueAutomationRetriesFailed(now.toISOString());
+  const missedResourceWaits = db.markOverdueAutomationResourceWaitsFailed(now.toISOString());
   const tasks = db.listAutomationTasks();
   for (const task of tasks) {
     if (!task.enabled) continue;
@@ -2568,7 +2649,7 @@ function refreshAutomationSchedulesOnStartup(): void {
     const nextRunAt = calculateNextRunAt(task, now);
     db.updateAutomationTaskNextRunAt(task.id, nextRunAt);
   }
-  logEvent("main.automation.startup", { taskCount: tasks.length, missedRetries });
+  logEvent("main.automation.startup", { taskCount: tasks.length, missedRetries, missedResourceWaits });
   rescheduleAutomationTimer();
 }
 
