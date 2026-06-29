@@ -10,7 +10,6 @@ version: 1.2.0
 # 小红书内容发布
 
 本 Skill 只负责发布，不负责研究、内容生成、改写或复盘。
-发布确认的唯一责任方是本 Skill；`xhs-create` 不得提前询问确认。
 
 ## 工具边界
 
@@ -41,15 +40,6 @@ version: 1.2.0
 - `click-publish`、`save-draft`：`180000` 毫秒。
 - 发布结果回补模式命令：`180000` 毫秒。
 
-## 发布结果回补模式
-
-当本轮是自动化任务，且任务描述明确包含 `xhs-publish-reconcile`、`accountId`、`runId`、
-最终标题、发布触发时间和 attempt key 时，本 Skill 进入发布结果回补模式。
-
-回补模式只读取 `references/publish-reconcile.md` 执行一次既有发布尝试核对；不得执行
-`check-risk`、`fill-publish`、`fill-publish-video`、`publish`、`publish-video`、
-`click-publish`、`save-draft`、`long-article`、`select-template` 或 `next-step`。
-缺少任一回补输入时停止并报告，不猜测、不转入发布模式。
 
 ## 发布包硬依赖
 
@@ -70,7 +60,19 @@ version: 1.2.0
 远程图片 URL 原样传给 `fill-publish`/`publish`，由 CLI 下载；不得使用 `curl`、`wget` 手工下载。
 远程图片下载失败时保留发布包并报告失败 URL，不静默删除、替换图片或改用模板。
 
-## 流程
+
+## 发布结果回补模式
+
+当本轮是自动化任务，且任务描述明确包含 `xhs-publish-reconcile`、`accountId`、`runId`、
+最终标题、发布触发时间和 attempt key 时，本 Skill 进入发布结果回补模式。
+
+回补模式只读取 `references/publish-reconcile.md` 执行一次既有发布尝试核对；不得执行
+`check-risk`、`fill-publish`、`fill-publish-video`、`publish`、`publish-video`、
+`click-publish`、`save-draft`、`long-article`、`select-template` 或 `next-step`。
+缺少任一回补输入时停止并报告，不猜测、不转入发布模式。
+
+
+## 发布模式流程
 
 1. 发布确认前先运行 `$AGENTSTUDIO_XHS_CLI check-risk`，读取 `report.risk_level` 和风险摘要。
 2. 若 `risk_level == high` 且本轮是手动对话，调用 `AskUserQuestion` 展示高风险原因；
@@ -92,8 +94,7 @@ version: 1.2.0
 11. 返回发布记录：标题、正文摘要、标签、素材、发布时间、发布方式和平台结果。
 
 若本轮 system-reminder 明确说明当前是自动化任务运行且无需用户确认，则跳过上述
-发布包 `AskUserQuestion` 确认步骤，按任务描述和已绑定账号继续执行；但风控检查为 `high`
-时必须按 `XHS_RISK_HIGH_BEFORE_PUBLISH` 停止。自动化上下文中不得因为等待用户确认而停止。
+发布包 `AskUserQuestion` 确认步骤，按任务描述和已绑定账号继续执行；但风控检查为 `high`时必须按 `XHS_RISK_HIGH_BEFORE_PUBLISH` 停止。自动化上下文中不得因为等待用户确认而停止。
 
 图文示例：
 
@@ -122,6 +123,7 @@ $AGENTSTUDIO_XHS_CLI fill-publish-video \
   --content-file /absolute/content.txt \
   --video /absolute/video.mp4
 ```
+
 
 ## 失败处理
 

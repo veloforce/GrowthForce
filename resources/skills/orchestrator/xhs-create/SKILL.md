@@ -13,49 +13,41 @@ version: 1.1.0
 
 ## 账号定位 Gate 与长期数据规则
 
-内容生成前需要读取账号长期数据作为输入：`content_profile_get`（账号定位，最高优先级）、
-`content_playbook_read`（已验证规律，参考但不得违背 Profile）、`content_runs_recent`
-（最近发布与待复盘状态，用于避免重复选题）。
+内容生成前需要读取账号长期数据作为输入
+- 账号定位
+  - `content_profile_get` ，最高优先级,Profile 是账号级事实，不得根据账号昵称、用户身份、本轮主题或历史对话自行推断定位后继续创作
+  - Profile 已存在且足以完成本轮任务时，按 Profile 约束生成。Profile 缺失或缺少本轮目标必需
+    字段时，遵循选中账号 system reminder 中统一的 Profile 缺失处理规则，进行账号定位补全或
+    跳过。
 
-- 用户明确提出可长期复用的创作偏好、结构要求、风格要求、禁区或 CTA 习惯时，先用
-  `content_playbook_preferences_read` 读取「用户明示偏好」区，再用
-  `content_playbook_preferences_replace` 整段替换该区。不得写入表现判断或数据规律。
-- 如果 system reminder 提供了已选内容账号，本 Skill 在生成前必须使用该账号的 AccountRef
-  调用 `content_profile_get` 检查统一的 Profile。Profile 是账号级事实，不得根据账号昵称、用户身份、本轮主题或历史对话自行推断定位后继续创作。
+- 创作经验
+  - `content_playbook_read` 已验证规律，参考但不得违背 Profile
+  - `content_runs_recent` 最近发布与待复盘状态，用于避免重复选题
 
-- Profile 已存在且足以完成本轮任务时，按 Profile 约束生成。Profile 缺失或缺少本轮目标必需
-  字段时，遵循选中账号 system reminder 中统一的 Profile 缺失处理规则，进行账号定位补全或
-  跳过。
-
+- 用户偏好
+  - 用户明确提出可长期复用的创作偏好、结构要求、风格要求、禁区或 CTA 习惯时
+  - 先用`content_playbook_preferences_read` 读取「用户明示偏好」区
+  - 再用`content_playbook_preferences_replace` 整段替换该区, 不得写入表现判断或数据规律
+  
 
 ## 内容创作要求
 
 平台规则参考
-- 生成或改写小红书笔记时，先读取 `references/platform-rules.md`，将其中的官方硬约束作为发布包
-  校验输入；非官方经验只能作为优化建议，不得表述为确定的平台算法或激励承诺。
+- 先读取 `references/platform-rules.md`，将其中的官方硬约束作为发布包校验规则；
+- 非官方经验只能作为优化建议，不得表述为确定的平台算法或激励承诺。
 
-站内笔记参考
-- 如果用户没有提供选题或明确的主题，或者用户要求进行小红书笔记调研，可以使用 references/xhs.md 
-
-用户提供URL内容
-- 如果用户提供 普通网页 URL（域名不是xiaohongshu.com），要求把这个内容变成笔记，则通过 references/url-to-note.md 来处理
-
-图片素材准备
-- 如果用户已经提供使用的图片，则不重复生成或替换，否则参考 references/img.md 来生成图片
+内容创作参考
+- 可以参考 references/xhs-create-reference.md
 
 
 ## Run 记录与初稿快照
-
+本 Skill 只创建本次 Run 并写 `draft` 快照；不写 History、证据规律、metrics 或 review，不创建发布后采集任务。
 Run 是完整运营任务的记录层，由本 Skill 作为生产起点创建并持有 runId：
 
-- 只要本轮产出可发布草稿或发布包，必须用 `content_run_create_with_draft`（传入本轮目标、
-  当前工作目录和初稿 Markdown）创建 Run，并记下 runId。该工具会把初稿写成**不可变快照**，
-  并将 `content_generation` 阶段置为 `completed`。
+- 只要本轮产出可发布草稿或发布包，必须用 `content_run_create_with_draft`（传入本轮目标、当前工作目录和初稿 Markdown）创建 Run，并记下 runId。
+- 该工具会把初稿写成**不可变快照**，并将 `content_generation` 阶段置为 `completed`
 - 该快照供后续复盘做版本对比，与用户在工作目录里继续编辑的工作文件相互独立、互不影响。
 - 只有局部润色、标题备选、结构建议等不形成可发布草稿/发布包的任务，才允许不创建 Run。
-
-本 Skill 只创建本次 Run 并写 `draft` 快照；不写 History、证据规律、metrics 或 review，
-不创建发布后采集任务。
 
 
 ## 输出发布包
@@ -75,11 +67,11 @@ Run 是完整运营任务的记录层，由本 Skill 作为生产起点创建并
 
 ## 发布交接
 
-当用户目标包含发布、完整运营闭环或自动化发布时，生成完整发布包后必须立即交给 `xhs-publish`，不得只返回发布包后停止。只有用户明确要求 “只生成草稿/只生成发布包/不发布”（“只生成内容”按只生成发布包处理）时，才停止。
+当用户目标包含发布、完整运营闭环或自动化发布时，生成完整发布包后必须立即交给 `xhs-publish`，不得返回发布包后自动停止。
+只有用户明确要求 “只生成草稿/只生成内容/不发布”时，才停止。
 
-如果需要交接发布包到 `xhs-publish`，发布确认的唯一责任方是 `xhs-publish`，互动确认的责任方是
-`xhs-interact`。本 Skill 只生成、校验并传递完整发布包和 runId：
-
+本 Skill 只生成、校验并传递完整发布包和 runId，不负责发布前确认：
+- 发布前确认是由`xhs-publish`负责。
 - 针对发布确认不得调用 `AskUserQuestion`。
 - 不得用普通文字询问用户是否确认发布。
 - 不得在交接前以 `end_turn` 停止。
