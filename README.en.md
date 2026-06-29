@@ -24,7 +24,11 @@
 
 ![GrowthForce home conversation workspace](./docs/image/home.png)
 
-![GrowthForce plugins and skills management](./docs/image/20260620132106.jpg)
+![GrowthForce content publishing conversation](./docs/image/chat.png)
+
+![GrowthForce connector settings](./docs/image/connector.png)
+
+![GrowthForce plugins and skills management](./docs/image/skill.jpg)
 
 ![GrowthForce automation task configuration](./docs/image/automation.png)
 

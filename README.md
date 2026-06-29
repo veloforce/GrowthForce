@@ -24,7 +24,11 @@
 
 ![GrowthForce 首页对话工作台](./docs/image/home.png)
 
-![GrowthForce 插件和技能管理](./docs/image/20260620132106.jpg)
+![GrowthForce 内容发布对话](./docs/image/chat.png)
+
+![GrowthForce 连接器设置](./docs/image/connector.png)
+
+![GrowthForce 插件和技能管理](./docs/image/skill.jpg)
 
 ![GrowthForce 自动化任务配置](./docs/image/automation.png)
 
