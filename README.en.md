@@ -155,7 +155,7 @@ GrowthForce aims to become the infrastructure for content operations: open-sourc
 
 ### Collaboration Opportunities
 
-We welcome collaboration in the following areas:
+We welcome collaboration in the following areas: youzai8913@gmail.com
 
 | Area | Description |
 |------|-------------|
