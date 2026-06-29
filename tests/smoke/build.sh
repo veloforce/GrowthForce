@@ -563,7 +563,11 @@ if (accountProfileSkillSource.includes('accountId: "default"')) {
 const accountDiagnosisSkillSource = fs.readFileSync(path.join("resources", "skills", "orchestrator", "account-diagnosis-ops", "SKILL.md"), "utf8");
 for (const expected of [
   "name: account-diagnosis-ops",
+  "账号定位 Gate",
   "content_profile_get",
+  "Profile 已有信息足以完成本轮诊断时直接使用",
+  "统一的 Profile 缺失处理规则",
+  "account-profile-ops",
   "user-profile --user-id <accountId>",
   "wechat_published_articles_fetch",
   "wechat_metrics_fetch(days=7)",
@@ -573,6 +577,11 @@ for (const expected of [
 ]) {
   if (!accountDiagnosisSkillSource.includes(expected)) {
     throw new Error(`Expected account-diagnosis-ops contract to include: ${expected}`);
+  }
+}
+for (const obsolete of ["Profile 缺失时继续诊断，不询问", "只使用已有字段，不触发 `account-profile-ops` 补全"]) {
+  if (accountDiagnosisSkillSource.includes(obsolete)) {
+    throw new Error(`Expected account-diagnosis-ops to remove obsolete profile handling: ${obsolete}`);
   }
 }
 for (const forbidden of ["content_profile_patch", "content_playbook_write", "content_history_write", "content_run_create"]) {
@@ -1101,6 +1110,70 @@ const imageTool = require("./resources/tools/image/dist/index.js");
       template: "xhs_blue_grid_paper",
       outputPath: xhsContentPath
     });
+    const newlineCases = [
+      {
+        type: "xhs_cover",
+        template: "xhs_blue_grid_paper",
+        actual: { title: "第一行\n第二行" },
+        escaped: { title: "第一行\\n第二行" }
+      },
+      {
+        type: "gzh_cover",
+        template: "wechat_minimal_magazine",
+        actual: { title: "封面标题", subtitle: "第一行\n第二行" },
+        escaped: { title: "封面标题", subtitle: "第一行\\n第二行" }
+      },
+      {
+        type: "xhs_content",
+        template: "xhs_blue_grid_paper",
+        actual: { title: "内容标题", content: "第一行\n第二行" },
+        escaped: { title: "内容标题", content: "第一行\\n第二行" }
+      },
+      {
+        type: "gzh_content",
+        template: "article_key_takeaway",
+        actual: { title: "内容标题", content: "第一行\r\n第二行" },
+        escaped: { title: "内容标题", content: "第一行\\r\\n第二行" }
+      }
+    ];
+    for (const [index, newlineCase] of newlineCases.entries()) {
+      const actualPath = path.join(tempDir, `newline-actual-${index}.png`);
+      const escapedPath = path.join(tempDir, `newline-escaped-${index}.png`);
+      await imageTool.generateTemplateImage({
+        type: newlineCase.type,
+        template: newlineCase.template,
+        ...newlineCase.actual,
+        outputPath: actualPath
+      });
+      await imageTool.generateTemplateImage({
+        type: newlineCase.type,
+        template: newlineCase.template,
+        ...newlineCase.escaped,
+        outputPath: escapedPath
+      });
+      if (!fs.readFileSync(actualPath).equals(fs.readFileSync(escapedPath))) {
+        throw new Error(`Expected escaped newline input to render like an actual newline for ${newlineCase.type}`);
+      }
+    }
+    const escapedTabPath = path.join(tempDir, "escaped-tab.png");
+    const plainTabPath = path.join(tempDir, "plain-tab.png");
+    await imageTool.generateTemplateImage({
+      type: "gzh_content",
+      title: "转义验证",
+      content: "第一行\\t第二行",
+      template: "article_key_takeaway",
+      outputPath: escapedTabPath
+    });
+    await imageTool.generateTemplateImage({
+      type: "gzh_content",
+      title: "转义验证",
+      content: "第一行t第二行",
+      template: "article_key_takeaway",
+      outputPath: plainTabPath
+    });
+    if (fs.readFileSync(escapedTabPath).equals(fs.readFileSync(plainTabPath))) {
+      throw new Error("Expected unrelated escaped text such as \\\\t to remain literal");
+    }
     for (const [result, expectedWidth, expectedHeight] of [
       [cover, 1476, 628],
       [content, 1536, 1024],

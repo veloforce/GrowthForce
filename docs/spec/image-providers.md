@@ -65,7 +65,9 @@ imageProviders:
   `gzh_content`。
 - `image_template_generate` 接收 `type`、`title`、可选 `subtitle`、可选 `content`、可选
   `template` 和 `outputPath`。封面只接受 `subtitle`；`xhs_content` 和 `gzh_content` 只接受支持
-  显式及自动换行的 `content`。Agent 需要内容匹配时先查询同类型模板；未指定模板时按标题哈希稳定选择。
+  显式及自动换行的 `content`。`title`、`subtitle`、`content` 均同时识别真实换行符和字面量
+  `\n`；字面量 `\r\n` 也统一为单次换行。Agent 需要内容匹配时先查询同类型模板；未指定模板时
+  按标题哈希稳定选择。
 - 模板生成前硬校验文字长度：`xhs_cover` title/subtitle 为 18/30 字，`xhs_content`
   title/content 为 18/140 字，`gzh_cover` title/subtitle 为 18/30 字，`gzh_content`
   title/content 为 18/160 字；超出时返回错误，不自动截断。

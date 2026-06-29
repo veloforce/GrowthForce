@@ -208,9 +208,9 @@ export function createServer() {
         "本地模板图片生成：封面排版标题和可选副标题，内容图排版标题和可选正文，输出 PNG。",
         {
           type: z.enum(["xhs_cover", "xhs_content", "gzh_cover", "gzh_content"]).describe("模板业务类型：小红书封面、小红书内容图、公众号封面或公众号内容图。"),
-          title: z.string().min(1).describe("必须显示的主标题。"),
-          subtitle: z.string().optional().describe("封面可选副标题；仅用于 xhs_cover 和 gzh_cover，为空时不显示。"),
-          content: z.string().optional().describe("内容图可选正文；仅用于 xhs_content 和 gzh_content，支持显式换行和自动换行。"),
+          title: z.string().min(1).describe("必须显示的主标题；支持真实换行和字面量 \\n 换行。"),
+          subtitle: z.string().optional().describe("封面可选副标题；仅用于 xhs_cover 和 gzh_cover，为空时不显示，支持真实换行和字面量 \\n 换行。"),
+          content: z.string().optional().describe("内容图可选正文；仅用于 xhs_content 和 gzh_content，支持真实换行、字面量 \\n 换行和自动换行。"),
           template: z.string().optional().describe("可选模板 id；应先用 image_template_list 查询当前 type。省略时根据标题稳定选择。"),
           outputPath: z.string().min(1).describe("以 .png 结尾的图片保存路径。相对路径基于当前工作目录，支持 ~/ 前缀。")
         },
@@ -260,9 +260,9 @@ export async function generateImage(args: GenerateImageArgs): Promise<GenerateIm
 }
 
 export async function generateTemplateImage(args: GenerateTemplateImageArgs, assetsDir = TEMPLATE_ASSETS_DIR): Promise<GenerateTemplateImageResult> {
-  const title = args.title.trim();
-  const subtitle = args.subtitle?.trim() || "";
-  const content = args.content?.trim() || "";
+  const title = normalizeTemplateText(args.title);
+  const subtitle = normalizeTemplateText(args.subtitle);
+  const content = normalizeTemplateText(args.content);
   if (!title) throw new Error("模板图片生成需要非空 title。");
   const isContentTemplate = args.type === "xhs_content" || args.type === "gzh_content";
   if (isContentTemplate && subtitle) {
@@ -839,6 +839,14 @@ function validateTemplateTextLength(type: ImageTemplateType, field: "title" | "s
   if (length > maxLength) {
     throw new Error(`${type} 的 ${field} 超过字数限制：当前 ${length} 字，最多 ${maxLength} 字。`);
   }
+}
+
+function normalizeTemplateText(value?: string): string {
+  return (value ?? "")
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\r\n?/g, "\n")
+    .trim();
 }
 
 export function resolveTemplateFontPaths(assetsDir = TEMPLATE_ASSETS_DIR): { title: string; content: string } {
