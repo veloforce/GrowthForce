@@ -84,6 +84,234 @@ test("renderer workbench shows Electron-only notice in a browser", async ({ page
   expect(["running", "pending"]).toContain(restartedClockAnimation.playState);
 });
 
+test("automation task composer separates create, view, and edit context rules", async ({ page }) => {
+  await page.addInitScript(({ completeConfig, mockPaths }) => {
+    const accountA = {
+      id: 1,
+      platform: "xhs",
+      profileKey: "xhs_account_a",
+      accountId: "xhs-a",
+      accountHandle: "account-a",
+      displayName: "账号 A",
+      avatarUrl: null,
+      status: "authorized",
+      opsState: { reviewTaskId: null },
+      createdAt: "2026-06-01T00:00:00.000Z",
+      updatedAt: "2026-06-01T00:00:00.000Z",
+      lastAuthorizedAt: "2026-06-01T00:00:00.000Z"
+    };
+    const accountB = {
+      ...accountA,
+      id: 2,
+      profileKey: "xhs_account_b",
+      accountId: "xhs-b",
+      accountHandle: "account-b",
+      displayName: "账号 B",
+      createdAt: "2026-06-02T00:00:00.000Z"
+    };
+    const skill = { name: "xhs-create", agent: "orchestrator", description: "小红书创作", enabled: true, status: "enabled" };
+    const attachment = { name: "brief.md", path: "/tmp/agentstudio-test/brief.md" };
+    let tasks = [{
+      id: 7,
+      name: "已有任务",
+      description: "旧任务描述",
+      workspacePath: "/tmp/agentstudio-test/workspace",
+      scheduleType: "daily",
+      scheduleConfig: { hour: 9, minute: 0 },
+      maxRetries: 0,
+      maxRuns: null,
+      runCount: 0,
+      connectorBindings: { xhs: { profileKey: accountA.profileKey, accountId: accountA.accountId, displayName: accountA.displayName } },
+      selectedSkills: [{ name: skill.name, agent: skill.agent, description: skill.description }],
+      attachments: [attachment],
+      enabled: true,
+      nextRunAt: "2026-06-30T01:00:00.000Z",
+      createdAt: "2026-06-01T00:00:00.000Z",
+      updatedAt: "2026-06-01T00:00:00.000Z"
+    }];
+    const createCalls: unknown[] = [];
+    const updateCalls: unknown[] = [];
+    const globalWorkspaceCalls: unknown[] = [];
+    const globalConnectorCalls: unknown[] = [];
+    (window as Window & {
+      __automationCreateCalls?: unknown[];
+      __automationUpdateCalls?: unknown[];
+      __globalWorkspaceCalls?: unknown[];
+      __globalConnectorCalls?: unknown[];
+    }).__automationCreateCalls = createCalls;
+    (window as Window & { __automationUpdateCalls?: unknown[] }).__automationUpdateCalls = updateCalls;
+    (window as Window & { __globalWorkspaceCalls?: unknown[] }).__globalWorkspaceCalls = globalWorkspaceCalls;
+    (window as Window & { __globalConnectorCalls?: unknown[] }).__globalConnectorCalls = globalConnectorCalls;
+
+    const settings = {
+      chat: { permissionMode: "auto" },
+      ui: { themeMode: "system" },
+      connector: { xhs: { selected_account: accountA.profileKey }, wechat: { selected_account: "" } },
+      workspace: { recentDirectories: ["/tmp/agentstudio-test/recent-workspace"] },
+      skills: { installed: {}, disabled: [] }
+    };
+
+    // @ts-ignore Browser smoke test provides the Electron preload surface.
+    window.agentStudio = {
+      bootstrap: async () => ({
+        paths: mockPaths,
+        config: completeConfig,
+        needsOnboarding: false,
+        modelProviderSettings: { providers: [] },
+        imageProviderSettings: { imageProviders: [] },
+        settings,
+        theme: { themeMode: "system", resolved: "light" },
+        workbenchPrompts: { typingPrompts: ["我是小G"], quickPrompts: [] },
+        connectorState: { accounts: [accountA, accountB], selected: { xhs: accountA.profileKey, wechat: "" }, locked: { xhs: {} } },
+        workspace: { currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: ["/tmp/agentstudio-test/recent-workspace"] },
+        sessions: []
+      }),
+      saveProviderConfig: async () => ({ config: completeConfig, modelProviderSettings: { providers: [] }, needsOnboarding: false }),
+      getModelProviderSettings: async () => ({ settings: { providers: [] }, config: completeConfig }),
+      getImageProviderSettings: async () => ({ settings: { imageProviders: [] }, config: completeConfig }),
+      saveModelProviderSettings: async () => ({ settings: { providers: [] }, config: completeConfig, needsOnboarding: false }),
+      saveImageProviderSettings: async () => ({ settings: { imageProviders: [] }, config: completeConfig, needsOnboarding: false }),
+      listSessions: async () => [],
+      getSession: async () => null,
+      getWorkspace: async () => ({ currentPath: "/tmp/agentstudio-test/workspace", defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: ["/tmp/agentstudio-test/recent-workspace"] }),
+      setWorkspace: async (workspacePath: string) => {
+        globalWorkspaceCalls.push(workspacePath);
+        return { currentPath: workspacePath, defaultPath: "/tmp/agentstudio-test/workspace", recentDirectories: ["/tmp/agentstudio-test/recent-workspace"] };
+      },
+      chooseWorkspace: async () => null,
+      chooseFiles: async () => [attachment],
+      readArtifactFile: async () => null,
+      updatePermissionMode: async () => settings,
+      updateThemeMode: async () => ({ settings, theme: { themeMode: "system", resolved: "light" } }),
+      listAgents: async () => [],
+      listSkills: async () => ({ skills: [skill], errors: [], conflicts: [] }),
+      enableSkill: async () => ({ skills: [skill], errors: [], conflicts: [] }),
+      disableSkill: async () => ({ skills: [skill], errors: [], conflicts: [] }),
+      listMarketSkills: async () => ({ skills: [], errors: [] }),
+      getSkillContent: async () => null,
+      installGithubSkill: async () => null,
+      listAutomationTasks: async () => tasks,
+      getAutomationTask: async () => tasks[0],
+      createAutomationTask: async (input: unknown) => {
+        createCalls.push(input);
+        return { ...tasks[0], id: 8, ...(input as Record<string, unknown>) };
+      },
+      updateAutomationTask: async (id: number, input: unknown) => {
+        updateCalls.push({ id, input });
+        tasks = tasks.map((task) => task.id === id ? { ...task, ...(input as Record<string, unknown>), id } : task);
+        return tasks.find((task) => task.id === id);
+      },
+      setAutomationTaskEnabled: async () => tasks[0],
+      deleteAutomationTask: async () => null,
+      listAutomationRuns: async () => [],
+      getAutomationRunSession: async () => null,
+      chooseAutomationWorkspace: async () => "/tmp/agentstudio-test/chosen-workspace",
+      getConnectorState: async () => ({ accounts: [accountA, accountB], selected: { xhs: accountA.profileKey, wechat: "" }, locked: { xhs: {} } }),
+      createXhsAccount: async () => null,
+      selectXhsAccount: async (profileKey: string) => {
+        globalConnectorCalls.push(profileKey);
+        return { state: { accounts: [accountA, accountB], selected: { xhs: profileKey, wechat: "" }, locked: { xhs: {} } }, valid: true };
+      },
+      clearXhsAccountSelection: async () => {
+        globalConnectorCalls.push("");
+        return { accounts: [accountA, accountB], selected: { xhs: "", wechat: "" }, locked: { xhs: {} } };
+      },
+      deleteXhsAccount: async () => null,
+      setConnectorAccountAutoReview: async () => null,
+      startXhsLogin: async () => null,
+      waitXhsLogin: async () => null,
+      logoutXhs: async () => null,
+      updateBrowserSurface: async () => null,
+      onAutomationChanged: () => () => undefined,
+      startTurn: async () => null,
+      cancelTurn: async () => null,
+      onAgentEvent: () => () => undefined
+    };
+  }, { completeConfig, mockPaths });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "自动化运营" }).click();
+  await page.getByRole("button", { name: "创建" }).click();
+  const modal = page.locator(".automationModal");
+  await expect(modal.locator(".automationComposerChip")).toHaveCount(0);
+  await expect(modal.locator(".automationWorkspacePicker")).toHaveAttribute("aria-label", "项目目录：/tmp/agentstudio-test/workspace");
+  await expect(modal.locator(".automationConnectorPicker")).toHaveAttribute("aria-label", "连接器：账号 A");
+  await expect(modal.locator(".permissionPicker")).toHaveAttribute("aria-label", "权限：完全访问");
+  await expect(modal.locator(".permissionPicker")).toBeDisabled();
+
+  await modal.locator("textarea").fill("新任务描述");
+  await modal.locator(".automationWorkspacePicker").click();
+  await modal.locator(".workspaceRecentItem", { hasText: "recent-workspace" }).click();
+  await modal.locator(".automationConnectorPicker").click();
+  await modal.locator(".connectorMenuItem", { hasText: "小红书" }).hover();
+  await modal.locator(".automationConnectorSubmenu button", { hasText: "不绑定" }).click();
+  await modal.locator(".addButton").click();
+  await modal.locator(".automationComposerMenu button", { hasText: "添加文件" }).click();
+  await modal.locator(".addButton").click();
+  await modal.locator(".automationComposerMenuItem", { hasText: "使用技能" }).hover();
+  await modal.locator(".automationComposerSubmenu button", { hasText: "xhs-create" }).click();
+  await expect(modal.locator(".automationComposerChip", { hasText: "brief.md" })).toHaveCount(1);
+  await expect(modal.locator(".automationComposerChip", { hasText: "xhs-create" })).toHaveCount(1);
+  await modal.getByRole("button", { name: "保存" }).click();
+
+  await expect.poll(() => page.evaluate(() => (window as Window & { __automationCreateCalls?: Array<{
+    workspacePath?: string;
+    connectorBindings?: { xhs?: unknown };
+    selectedSkills?: unknown[];
+    attachments?: unknown[];
+  }> }).__automationCreateCalls)).toEqual([
+    expect.objectContaining({
+      workspacePath: "/tmp/agentstudio-test/recent-workspace",
+      description: "新任务描述",
+      connectorBindings: {},
+      selectedSkills: [expect.objectContaining({ name: "xhs-create" })],
+      attachments: [expect.objectContaining({ name: "brief.md" })]
+    })
+  ]);
+  await expect.poll(() => page.evaluate(() => (window as Window & { __globalWorkspaceCalls?: unknown[] }).__globalWorkspaceCalls)).toEqual([]);
+  await expect.poll(() => page.evaluate(() => (window as Window & { __globalConnectorCalls?: unknown[] }).__globalConnectorCalls)).toEqual([]);
+
+  await page.getByRole("button", { name: /已有任务/ }).click();
+  const panel = page.locator(".rightPanel");
+  await expect(panel.locator(".automationForm-view textarea")).toBeDisabled();
+  await expect(panel.locator(".automationForm-view input").first()).toBeDisabled();
+  await expect(panel.locator(".automationWorkspacePicker")).toBeDisabled();
+  await expect(panel.locator(".automationConnectorPicker")).toBeDisabled();
+  await expect(panel.locator(".addButton")).toBeDisabled();
+  await expect(panel.getByRole("button", { name: "保存修改" })).toHaveCount(0);
+
+  await panel.getByRole("button", { name: "编辑任务" }).click();
+  await expect(panel.locator(".automationForm-edit textarea")).toBeEnabled();
+  await expect(panel.locator(".automationWorkspacePicker")).toBeDisabled();
+  await expect(panel.locator(".permissionPicker")).toBeDisabled();
+  await panel.locator(".automationForm-edit textarea").fill("编辑后的描述");
+  await panel.locator(".automationConnectorPicker").click();
+  await panel.locator(".connectorMenuItem", { hasText: "小红书" }).hover();
+  await panel.locator(".automationConnectorSubmenu button", { hasText: "账号 B" }).click();
+  await panel.locator(".automationComposerChip", { hasText: "brief.md" }).click();
+  await panel.locator(".automationComposerChip", { hasText: "xhs-create" }).click();
+  await panel.getByRole("button", { name: "保存修改" }).click();
+
+  await expect.poll(() => page.evaluate(() => (window as Window & { __automationUpdateCalls?: Array<{ input?: {
+    workspacePath?: string;
+    description?: string;
+    connectorBindings?: { xhs?: { profileKey?: string } };
+    selectedSkills?: unknown[];
+    attachments?: unknown[];
+  } }> }).__automationUpdateCalls)).toEqual([
+    expect.objectContaining({
+      id: 7,
+      input: expect.objectContaining({
+        workspacePath: "/tmp/agentstudio-test/workspace",
+        description: "编辑后的描述",
+        connectorBindings: { xhs: expect.objectContaining({ profileKey: "xhs_account_b" }) },
+        selectedSkills: [],
+        attachments: []
+      })
+    })
+  ]);
+});
+
 test("renderer handles normal tool permission actions", async ({ page }) => {
   await page.addInitScript(({ completeConfig, mockPaths }) => {
     const permissionListeners: Array<(request: unknown) => void> = [];

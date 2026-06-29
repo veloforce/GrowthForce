@@ -30,6 +30,7 @@ import {
   PanelRightOpen,
   Paperclip,
   PackageOpen,
+  Pencil,
   Plug,
   Plus,
   RefreshCw,
@@ -54,7 +55,7 @@ import douyinLogoUrl from "./assets/connectors/dy.png";
 import gzhLogoUrl from "./assets/connectors/gzh.png";
 import xhsLogoUrl from "./assets/connectors/xhs.png";
 import { formatAutomationSchedule, formatAutomationStatus } from "@shared/automation";
-import type { AgentEvent, AgentPermissionRequest, AgentPermissionResponse, AgentStudioConfig, AgentStudioSettings, AgentSupplementQueueItem, ArtifactFileKind, ArtifactFilePreview, AutomationRun, AutomationScheduleConfig, AutomationScheduleType, AutomationTask, AutomationTaskInput, ChatPermissionMode, ImageProviderDefinition, ImageProviderSettings, ImageProviderType, LocalAttachment, MarketSkillItem, ModelProviderConfig, ModelProviderDefinition, ModelProviderSettings, PromptSkillReference, RuntimePaths, SessionDetail, SessionRecord, SkillContent, SkillListItem, StoredChatMessage, StoredSupplementMessage, StoredTextMessage, StoredToolCall, ThemeMode, ThemeState, WorkbenchPrompts, WorkbenchQuickPrompt, WorkspaceState } from "@shared/types";
+import type { AgentEvent, AgentPermissionRequest, AgentPermissionResponse, AgentStudioConfig, AgentStudioSettings, AgentSupplementQueueItem, ArtifactFileKind, ArtifactFilePreview, AutomationConnectorBinding, AutomationRun, AutomationScheduleConfig, AutomationScheduleType, AutomationTask, AutomationTaskInput, ChatPermissionMode, ImageProviderDefinition, ImageProviderSettings, ImageProviderType, LocalAttachment, MarketSkillItem, ModelProviderConfig, ModelProviderDefinition, ModelProviderSettings, PromptSkillReference, RuntimePaths, SessionDetail, SessionRecord, SkillContent, SkillListItem, StoredChatMessage, StoredSupplementMessage, StoredTextMessage, StoredToolCall, ThemeMode, ThemeState, WorkbenchPrompts, WorkbenchQuickPrompt, WorkspaceState } from "@shared/types";
 import type { ConnectorAccount, ConnectorState } from "@shared/types";
 
 type ChatMessage = StoredChatMessage;
@@ -62,6 +63,7 @@ type AppView = "workbench" | "skills" | "automation";
 type RightPanelMode = "browser" | "artifact";
 type SkillTab = "market" | "installed";
 type AutomationTab = "tasks" | "runs";
+type AutomationTaskFormMode = "create" | "view" | "edit";
 type ProviderSettingsTab = "model" | "image";
 type SettingsSection = "providers" | "connectors";
 type ConnectorSettingsTab = "xhs" | "wechat" | "douyin";
@@ -274,6 +276,7 @@ export function App() {
   const [selectedAutomationTask, setSelectedAutomationTask] = useState<AutomationTask | null>(null);
   const [selectedAutomationRun, setSelectedAutomationRun] = useState<AutomationRun | null>(null);
   const [automationTaskDraft, setAutomationTaskDraft] = useState<AutomationTaskInput | null>(null);
+  const [automationTaskPanelMode, setAutomationTaskPanelMode] = useState<"view" | "edit">("view");
   const [automationRunMessages, setAutomationRunMessages] = useState<ChatMessage[]>([]);
   const [automationRunLoading, setAutomationRunLoading] = useState(false);
   const [selectedSkill, setSelectedSkill] = useState<{ source: "installed" | "market"; name: string; agent: string } | null>(null);
@@ -1062,6 +1065,7 @@ export function App() {
     setActiveView("automation");
     setRightOpen(false);
     void refreshAutomation();
+    void refreshSkills();
   }
 
   async function refreshAutomation() {
@@ -1088,13 +1092,14 @@ export function App() {
   }
 
   function openAutomationCreate(preset?: { name: string; description: string }) {
+    if (installedSkills.length === 0) void refreshSkills();
     setAutomationDraft({
       ...createAutomationDraft(bootstrap?.workspace.currentPath, preset),
       connectorBindings: {
         ...(selectedXhsAccount ? { xhs: automationConnectorBinding(selectedXhsAccount) } : {})
       },
-      selectedSkills: selectedPromptSkills,
-      attachments
+      selectedSkills: [],
+      attachments: []
     });
     setAutomationDialogOpen(true);
     setAutomationError("");
@@ -1123,6 +1128,7 @@ export function App() {
       const task = (await window.agentStudio.updateAutomationTask(selectedAutomationTask.id, automationTaskDraft)) as AutomationTask;
       setSelectedAutomationTask(task);
       setAutomationTaskDraft(taskToInput(task));
+      setAutomationTaskPanelMode("view");
       await refreshAutomation();
     } catch (err) {
       setAutomationError(err instanceof Error ? err.message : String(err));
@@ -1149,6 +1155,7 @@ export function App() {
     if (selectedAutomationTask?.id === id) {
       setSelectedAutomationTask(null);
       setAutomationTaskDraft(null);
+      setAutomationTaskPanelMode("view");
       setRightOpen(false);
     }
     await refreshAutomation();
@@ -1177,12 +1184,14 @@ export function App() {
     setAutomationRunMessages([]);
     setSelectedAutomationTask(task);
     setAutomationTaskDraft(taskToInput(task));
+    setAutomationTaskPanelMode("view");
     setRightOpen(true);
   }
 
   async function selectAutomationRun(run: AutomationRun) {
     setSelectedAutomationTask(null);
     setAutomationTaskDraft(null);
+    setAutomationTaskPanelMode("view");
     setSelectedAutomationRun(run);
     setAutomationRunMessages([]);
     setAutomationRunLoading(true);
@@ -2221,9 +2230,16 @@ export function App() {
                 runLoading={automationRunLoading}
                 runMessages={automationRunMessages}
                 task={selectedAutomationTask}
+                mode={automationTaskPanelMode}
+                recentDirectories={bootstrap?.workspace.recentDirectories ?? []}
                 onChooseWorkspace={() => void chooseAutomationWorkspace("edit")}
                 onChooseFiles={() => void chooseAutomationFiles("edit")}
                 onDraftChange={setAutomationTaskDraft}
+                onEdit={() => setAutomationTaskPanelMode("edit")}
+                onCancelEdit={() => {
+                  setAutomationTaskDraft(selectedAutomationTask ? taskToInput(selectedAutomationTask) : null);
+                  setAutomationTaskPanelMode("view");
+                }}
                 onSave={() => void saveAutomationTaskDetail()}
               />
             ) : (
@@ -2253,6 +2269,7 @@ export function App() {
           busy={automationBusy}
           draft={automationDraft}
           error={automationError}
+          recentDirectories={bootstrap?.workspace.recentDirectories ?? []}
           title="创建自动化"
           onCancel={() => setAutomationDialogOpen(false)}
           onChooseWorkspace={() => void chooseAutomationWorkspace("create")}
@@ -3301,6 +3318,7 @@ function AutomationTaskModal(props: {
   busy: boolean;
   draft: AutomationTaskInput;
   error: string;
+  recentDirectories: string[];
   title: string;
   onCancel: () => void;
   onChooseWorkspace: () => void;
@@ -3318,7 +3336,7 @@ function AutomationTaskModal(props: {
           </button>
         </header>
         {props.error && <div className="errorBanner">{props.error}</div>}
-        <AutomationTaskForm accounts={props.accounts} availableSkills={props.availableSkills} draft={props.draft} onChooseFiles={props.onChooseFiles} onChooseWorkspace={props.onChooseWorkspace} onDraftChange={props.onDraftChange} />
+        <AutomationTaskForm accounts={props.accounts} availableSkills={props.availableSkills} draft={props.draft} mode="create" recentDirectories={props.recentDirectories} onChooseFiles={props.onChooseFiles} onChooseWorkspace={props.onChooseWorkspace} onDraftChange={props.onDraftChange} />
         <footer>
           <button className="secondaryButton" onClick={props.onCancel}>取消</button>
           <button className="primaryButton" onClick={props.onSave} disabled={props.busy}>
@@ -3340,9 +3358,13 @@ function AutomationRightPanel({
   runLoading,
   runMessages,
   task,
+  mode,
+  recentDirectories,
   onChooseWorkspace,
   onChooseFiles,
   onDraftChange,
+  onEdit,
+  onCancelEdit,
   onSave
 }: {
   accounts: ConnectorAccount[];
@@ -3353,24 +3375,41 @@ function AutomationRightPanel({
   runLoading: boolean;
   runMessages: ChatMessage[];
   task: AutomationTask | null;
+  mode: "view" | "edit";
+  recentDirectories: string[];
   onChooseWorkspace: () => void;
   onChooseFiles: () => void;
   onDraftChange: (draft: AutomationTaskInput | null) => void;
+  onEdit: () => void;
+  onCancelEdit: () => void;
   onSave: () => void;
 }) {
   if (task && draft) {
+    const formMode: AutomationTaskFormMode = mode === "edit" ? "edit" : "view";
     return (
       <>
         <header>
-          <strong>{task.name}</strong>
+          <div className="automationDetailTitle">
+            <strong>{task.name}</strong>
+            {mode === "view" && (
+              <button className="plainIcon automationEditIcon" onClick={onEdit} title="编辑任务" aria-label="编辑任务">
+                <Pencil size={16} />
+              </button>
+            )}
+          </div>
           <span>{task.enabled ? "已启用" : "已停用"}</span>
         </header>
         <div className="automationDetail">
-          <AutomationTaskForm accounts={accounts} availableSkills={availableSkills} draft={draft} onChooseFiles={onChooseFiles} onChooseWorkspace={onChooseWorkspace} onDraftChange={(next) => onDraftChange(next)} />
-          <button className="primaryButton" onClick={onSave} disabled={busy}>
-            <Save size={16} />
-            <span>{busy ? "保存中" : "保存修改"}</span>
-          </button>
+          <AutomationTaskForm accounts={accounts} availableSkills={availableSkills} draft={draft} mode={formMode} recentDirectories={recentDirectories} onChooseFiles={onChooseFiles} onChooseWorkspace={onChooseWorkspace} onDraftChange={(next) => onDraftChange(next)} />
+          {mode === "edit" && (
+            <div className="automationEditActions">
+              <button className="secondaryButton" onClick={onCancelEdit} disabled={busy}>取消</button>
+              <button className="primaryButton" onClick={onSave} disabled={busy}>
+                <Save size={16} />
+                <span>{busy ? "保存中" : "保存修改"}</span>
+              </button>
+            </div>
+          )}
         </div>
       </>
     );
@@ -3413,9 +3452,28 @@ function AutomationRightPanel({
   );
 }
 
-function AutomationTaskForm({ accounts, availableSkills, draft, onChooseFiles, onChooseWorkspace, onDraftChange }: { accounts: ConnectorAccount[]; availableSkills: SkillListItem[]; draft: AutomationTaskInput; onChooseFiles: () => void; onChooseWorkspace: () => void; onDraftChange: (draft: AutomationTaskInput) => void }) {
+function AutomationTaskForm({
+  accounts,
+  availableSkills,
+  draft,
+  mode,
+  recentDirectories,
+  onChooseFiles,
+  onChooseWorkspace,
+  onDraftChange
+}: {
+  accounts: ConnectorAccount[];
+  availableSkills: SkillListItem[];
+  draft: AutomationTaskInput;
+  mode: AutomationTaskFormMode;
+  recentDirectories: string[];
+  onChooseFiles: () => void;
+  onChooseWorkspace: () => void;
+  onDraftChange: (draft: AutomationTaskInput) => void;
+}) {
   const update = (patch: Partial<AutomationTaskInput>) => onDraftChange({ ...draft, ...patch });
   const updateConfig = (patch: AutomationScheduleConfig) => update({ scheduleConfig: { ...draft.scheduleConfig, ...patch } });
+  const detailReadOnly = mode === "view";
   const bindings = draft.connectorBindings ?? {};
   const selectedSkills = draft.selectedSkills ?? [];
   const taskAttachments = draft.attachments ?? [];
@@ -3431,113 +3489,385 @@ function AutomationTaskForm({ accounts, availableSkills, draft, onChooseFiles, o
     update({ selectedSkills: exists ? selectedSkills.filter((item) => item.name !== skill.name) : [...selectedSkills, { name: skill.name, agent: skill.agent, description: skill.description }] });
   };
   return (
-    <div className="automationForm">
-      <label>
-        <span>任务名称</span>
-        <input value={draft.name} onChange={(event) => update({ name: event.target.value })} placeholder="例如：内容日更" />
-      </label>
-      <label>
-        <span>项目目录</span>
-        <div className="pathInput">
-          <input value={draft.workspacePath} onChange={(event) => update({ workspacePath: event.target.value })} placeholder="选择任务运行目录" />
-          <button className="secondaryButton" onClick={onChooseWorkspace}>选择</button>
+    <div className={`automationForm automationForm-${mode}`}>
+      <section className="automationFormSection">
+        <div className="automationFormSectionHeader">
+          <strong>任务详情</strong>
         </div>
-      </label>
-      <label>
-        <span>任务描述</span>
-        <textarea value={draft.description} onChange={(event) => update({ description: event.target.value })} rows={4} placeholder="描述 agent 到点后需要执行的任务" />
-      </label>
-      <ScheduleEditor type={draft.scheduleType} config={draft.scheduleConfig} onConfigChange={updateConfig} onTypeChange={(scheduleType) => update({ scheduleType, scheduleConfig: defaultScheduleConfig(scheduleType) })} />
-      {draft.scheduleType === "interval" && (
-        <label>
-          <span>最多运行次数（留空表示无限）</span>
-          <input type="number" min={1} value={draft.maxRuns ?? ""} onChange={(event) => update({ maxRuns: event.target.value ? Math.max(1, Math.floor(Number(event.target.value))) : null })} />
-        </label>
-      )}
-      <label>
-        <span>最大重试次数</span>
-        <input type="number" min={0} max={20} value={draft.maxRetries} onChange={(event) => update({ maxRetries: Number(event.target.value) })} />
-      </label>
-      {(["xhs"] as const).map((platform) => (
-        <label key={platform}>
-          <span>小红书账号</span>
-          <select value={bindings[platform]?.profileKey ?? ""} onChange={(event) => updateBinding(platform, event.target.value)}>
-            <option value="">不绑定</option>
-            {accounts.filter((account) => account.platform === platform).map((account) => <option key={account.profileKey} value={account.profileKey}>{getConnectorAccountLabel(account)}</option>)}
-          </select>
-        </label>
-      ))}
-      <div className="automationContextGroup">
-        <span>使用 Skill</span>
-        <div className="automationContextOptions">
-          {availableSkills.map((skill) => <button type="button" key={skill.name} className={selectedSkills.some((item) => item.name === skill.name) ? "active" : ""} onClick={() => toggleSkill(skill)}>{skill.name}</button>)}
-          {availableSkills.length === 0 && <em>暂无已启用 Skill</em>}
+        <div className="automationDetailGrid">
+          <label>
+            <span>任务名称</span>
+            <input value={draft.name} onChange={(event) => update({ name: event.target.value })} placeholder="例如：内容日更" disabled={detailReadOnly} />
+          </label>
+          <label>
+            <span>最大重试次数</span>
+            <input type="number" min={0} max={20} value={draft.maxRetries} onChange={(event) => update({ maxRetries: Number(event.target.value) })} disabled={detailReadOnly} />
+          </label>
         </div>
-      </div>
-      <div className="automationContextGroup">
-        <span>选择的文件</span>
-        <div className="automationAttachmentList">
-          {taskAttachments.map((file) => <div key={file.path}><span title={file.path}>{file.name}</span><button type="button" title="移除文件" onClick={() => update({ attachments: taskAttachments.filter((item) => item.path !== file.path) })}><X size={14} /></button></div>)}
-          <button type="button" className="secondaryButton" onClick={onChooseFiles}><Paperclip size={15} />添加文件</button>
+        <ScheduleEditor
+          type={draft.scheduleType}
+          config={draft.scheduleConfig}
+          disabled={detailReadOnly}
+          maxRuns={draft.maxRuns ?? null}
+          onConfigChange={updateConfig}
+          onMaxRunsChange={(maxRuns) => update({ maxRuns })}
+          onTypeChange={(scheduleType) => update({ scheduleType, scheduleConfig: defaultScheduleConfig(scheduleType), maxRuns: scheduleType === "interval" ? draft.maxRuns : null })}
+        />
+      </section>
+      <section className="automationFormSection">
+        <div className="automationFormSectionHeader">
+          <strong>对话框</strong>
         </div>
-      </div>
-      <div className="automationPermissionNotice"><ShieldAlert size={16} />定时任务始终使用完全访问权限</div>
+        <AutomationTaskComposer
+          accounts={accounts}
+          availableSkills={availableSkills}
+          description={draft.description}
+          mode={mode}
+          recentDirectories={recentDirectories}
+          selectedSkills={selectedSkills}
+          taskAttachments={taskAttachments}
+          workspacePath={draft.workspacePath}
+          xhsBinding={bindings.xhs}
+          onAddFiles={onChooseFiles}
+          onDescriptionChange={(description) => update({ description })}
+          onRemoveFile={(path) => update({ attachments: taskAttachments.filter((item) => item.path !== path) })}
+          onRemoveSkill={(skill) => update({ selectedSkills: selectedSkills.filter((item) => item.name !== skill.name || item.agent !== skill.agent) })}
+          onChooseWorkspace={onChooseWorkspace}
+          onWorkspacePathChange={(workspacePath) => update({ workspacePath })}
+          onToggleSkill={toggleSkill}
+          onUpdateXhsBinding={(profileKey) => updateBinding("xhs", profileKey)}
+        />
+      </section>
     </div>
   );
 }
 
-function ScheduleEditor({ type, config, onConfigChange, onTypeChange }: { type: AutomationScheduleType; config: AutomationScheduleConfig; onConfigChange: (patch: AutomationScheduleConfig) => void; onTypeChange: (type: AutomationScheduleType) => void }) {
+function AutomationTaskComposer({
+  accounts,
+  availableSkills,
+  description,
+  mode,
+  recentDirectories,
+  selectedSkills,
+  taskAttachments,
+  workspacePath,
+  xhsBinding,
+  onAddFiles,
+  onChooseWorkspace,
+  onDescriptionChange,
+  onRemoveFile,
+  onRemoveSkill,
+  onToggleSkill,
+  onUpdateXhsBinding,
+  onWorkspacePathChange
+}: {
+  accounts: ConnectorAccount[];
+  availableSkills: SkillListItem[];
+  description: string;
+  mode: AutomationTaskFormMode;
+  recentDirectories: string[];
+  selectedSkills: PromptSkillReference[];
+  taskAttachments: LocalAttachment[];
+  workspacePath: string;
+  xhsBinding?: AutomationConnectorBinding;
+  onAddFiles: () => void;
+  onChooseWorkspace: () => void;
+  onDescriptionChange: (value: string) => void;
+  onRemoveFile: (path: string) => void;
+  onRemoveSkill: (skill: PromptSkillReference) => void;
+  onToggleSkill: (skill: SkillListItem) => void;
+  onUpdateXhsBinding: (profileKey: string) => void;
+  onWorkspacePathChange: (path: string) => void;
+}) {
+  const [activePopover, setActivePopover] = useState<"add" | "workspace" | "connector" | null>(null);
+  const addRef = useRef<HTMLDivElement | null>(null);
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const connectorRef = useRef<HTMLDivElement | null>(null);
+  const readOnly = mode === "view";
+  const workspaceLocked = mode !== "create";
+  const selectedXhs = accounts.find((account) => account.platform === "xhs" && account.profileKey === xhsBinding?.profileKey) ?? null;
+  const enabledSkills = availableSkills.filter((skill) => skill.enabled);
+
+  useEffect(() => {
+    if (!activePopover) return;
+    const current = activePopover;
+    function closeMenus(event: MouseEvent | PointerEvent) {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      const activeRef = current === "add" ? addRef.current : current === "workspace" ? workspaceRef.current : connectorRef.current;
+      if (activeRef?.contains(target)) return;
+      setActivePopover(null);
+    }
+    window.addEventListener("pointerdown", closeMenus);
+    return () => window.removeEventListener("pointerdown", closeMenus);
+  }, [activePopover]);
+
+  function togglePopover(popover: "add" | "workspace" | "connector") {
+    if (readOnly) return;
+    setActivePopover((current) => (current === popover ? null : popover));
+  }
+
+  function chooseRecentWorkspace(path: string) {
+    onWorkspacePathChange(path);
+    setActivePopover(null);
+  }
+
+  function chooseWorkspace() {
+    setActivePopover(null);
+    onChooseWorkspace();
+  }
+
+  function addFiles() {
+    setActivePopover(null);
+    onAddFiles();
+  }
+
+  function chooseSkill(skill: SkillListItem) {
+    onToggleSkill(skill);
+    setActivePopover(null);
+  }
+
+  function chooseXhsAccount(profileKey: string) {
+    onUpdateXhsBinding(profileKey);
+    setActivePopover(null);
+  }
+
+  return (
+    <div className={`automationComposer ${readOnly ? "readonly" : ""}`}>
+      {(taskAttachments.length > 0 || selectedSkills.length > 0) && (
+        <div className="automationComposerChips">
+          {taskAttachments.map((file) => (
+            <button key={file.path} type="button" className="automationComposerChip" onClick={() => !readOnly && onRemoveFile(file.path)} disabled={readOnly} title={file.path}>
+              <Paperclip size={14} />
+              <span>{file.name}</span>
+              {!readOnly && <X size={13} />}
+            </button>
+          ))}
+          {selectedSkills.map((skill) => (
+            <button key={`${skill.agent}:${skill.name}`} type="button" className="automationComposerChip skillChip" onClick={() => !readOnly && onRemoveSkill(skill)} disabled={readOnly} title={skill.description}>
+              <Wrench size={14} />
+              <span>{skill.name}</span>
+              {!readOnly && <X size={13} />}
+            </button>
+          ))}
+        </div>
+      )}
+      <textarea value={description} rows={4} onChange={(event) => onDescriptionChange(event.target.value)} placeholder="描述 agent 到点后需要执行的任务" disabled={readOnly} />
+      <div className="automationComposerControls">
+        <div className="automationComposerMenuWrap" ref={addRef}>
+          <button type="button" className="plainIcon addButton" title="添加" onClick={() => togglePopover("add")} disabled={readOnly}>
+            <Plus size={20} />
+          </button>
+          {activePopover === "add" && (
+            <div className="automationComposerMenu">
+              <button type="button" onClick={addFiles}>
+                <Paperclip size={18} />
+                <span>添加文件</span>
+              </button>
+              <div className="automationComposerMenuItem hasSubmenu">
+                <span>
+                  <Wrench size={18} />
+                  <span>使用技能</span>
+                </span>
+                <ChevronRight size={17} />
+                <div className="automationComposerSubmenu">
+                  {enabledSkills.map((skill) => (
+                    <button key={`${skill.agent}:${skill.name}`} type="button" className={selectedSkills.some((item) => item.name === skill.name && item.agent === skill.agent) ? "selected" : ""} onClick={() => chooseSkill(skill)} title={skill.description}>
+                      <span>{skill.name}</span>
+                      {selectedSkills.some((item) => item.name === skill.name && item.agent === skill.agent) && <Check size={15} />}
+                    </button>
+                  ))}
+                  {enabledSkills.length === 0 && <div className="submenuEmpty">暂无已启用技能</div>}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="automationWorkspaceWrap" ref={workspaceRef}>
+          <button type="button" className="automationWorkspacePicker" onClick={() => !workspaceLocked && togglePopover("workspace")} disabled={workspaceLocked} title={workspacePath || "选择项目目录"} aria-label={workspacePath ? `项目目录：${workspacePath}` : "选择项目目录"}>
+            <Folder size={15} />
+            <span className="workspaceCurrentLabel">{workspacePath ? getPathBasename(workspacePath) : "工作目录"}</span>
+          </button>
+          {activePopover === "workspace" && !workspaceLocked && (
+            <div className="automationWorkspaceMenu">
+              <div className="workspaceMenuTitle">最近使用的目录</div>
+              {recentDirectories.length > 0 ? recentDirectories.map((directory) => (
+                <button key={directory} type="button" className="workspaceRecentItem" onClick={() => chooseRecentWorkspace(directory)} title={directory}>
+                  <Folder size={18} />
+                  <span>{getPathBasename(directory)}</span>
+                </button>
+              )) : (
+                <div className="workspaceMenuEmpty">暂无最近目录</div>
+              )}
+              <div className="workspaceMenuDivider" />
+              <button type="button" className="workspaceMenuChoose" onClick={chooseWorkspace}>
+                <FolderOpen size={18} />
+                <span>选择目录</span>
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="automationConnectorWrap" ref={connectorRef}>
+          <button type="button" className={`automationConnectorPicker ${selectedXhs ? "selected" : ""}`} onClick={() => togglePopover("connector")} disabled={readOnly} title={selectedXhs ? `连接器：${getConnectorAccountLabel(selectedXhs)}` : "连接器"} aria-label={selectedXhs ? `连接器：${getConnectorAccountLabel(selectedXhs)}` : "连接器"}>
+            {selectedXhs ? <img className="connectorPickerLogo" src={xhsLogoUrl} alt="" /> : <Plug size={15} />}
+          </button>
+          {activePopover === "connector" && (
+            <div className="automationConnectorMenu">
+              <div className="connectorMenuItem hasSubmenu">
+                <span>
+                  <img className="connectorPlatformLogo" src={xhsLogoUrl} alt="" />
+                  <span>小红书</span>
+                </span>
+                <ChevronRight size={17} />
+                <div className="automationConnectorSubmenu">
+                  <button type="button" className={!selectedXhs ? "selected" : ""} onClick={() => chooseXhsAccount("")}>
+                    <span>不绑定</span>
+                    {!selectedXhs && <Check size={15} />}
+                  </button>
+                  {sortConnectorAccountsByCreatedAt(accounts.filter((account) => account.platform === "xhs")).map((account) => {
+                    const selected = account.profileKey === xhsBinding?.profileKey;
+                    return (
+                      <button key={account.profileKey} type="button" className={selected ? "selected" : ""} onClick={() => chooseXhsAccount(account.profileKey)} title={getConnectorAccountLabel(account)}>
+                        <span className="connectorAccountText">
+                          <span>{getConnectorAccountLabel(account)}</span>
+                          <small>{getConnectorAccountLoginStatusLabel(account)}</small>
+                        </span>
+                        {selected && <Check size={15} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="automationPermissionWrap">
+          <button type="button" className="permissionPicker permission-bypassPermissions" disabled title="完全访问" aria-label="权限：完全访问">
+            <PermissionIcon mode="bypassPermissions" size={15} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScheduleEditor({
+  type,
+  config,
+  disabled = false,
+  maxRuns,
+  onConfigChange,
+  onMaxRunsChange,
+  onTypeChange
+}: {
+  type: AutomationScheduleType;
+  config: AutomationScheduleConfig;
+  disabled?: boolean;
+  maxRuns: number | null;
+  onConfigChange: (patch: AutomationScheduleConfig) => void;
+  onMaxRunsChange: (value: number | null) => void;
+  onTypeChange: (type: AutomationScheduleType) => void;
+}) {
   return (
     <div className="scheduleEditor">
-      <label>
-        <span>计划时间</span>
-        <select value={type} onChange={(event) => onTypeChange(event.target.value as AutomationScheduleType)}>
-          <option value="once">一次性</option>
-          <option value="interval">固定间隔</option>
-          <option value="hourly">每小时</option>
-          <option value="daily">每天</option>
-          <option value="weekday">工作日</option>
-          <option value="weekly">每周</option>
-          <option value="monthly">每月</option>
-        </select>
-      </label>
+      <div className="scheduleMainRow">
+        <label className="scheduleTypeField">
+          <span>计划时间</span>
+          <select value={type} onChange={(event) => onTypeChange(event.target.value as AutomationScheduleType)} disabled={disabled}>
+            <option value="once">一次性</option>
+            <option value="interval">固定间隔</option>
+            <option value="hourly">每小时</option>
+            <option value="daily">每天</option>
+            <option value="weekday">工作日</option>
+            <option value="weekly">每周</option>
+            <option value="monthly">每月</option>
+          </select>
+        </label>
       {type === "once" && (
-        <label>
+        <label className="scheduleDateTimeField">
           <span>执行时间</span>
-          <input type="datetime-local" value={toDateTimeLocal(config.runAt)} onChange={(event) => onConfigChange({ runAt: fromDateTimeLocal(event.target.value) })} />
+          <input type="datetime-local" value={toDateTimeLocal(config.runAt)} onChange={(event) => onConfigChange({ runAt: fromDateTimeLocal(event.target.value) })} disabled={disabled} />
         </label>
       )}
       {type === "interval" && (
         <>
-          <NumberInput label="间隔数值" value={config.intervalValue ?? config.intervalMinutes ?? 1} min={1} onChange={(value) => onConfigChange({ intervalValue: value })} />
-          <label>
-            <span>间隔单位</span>
-            <select value={config.intervalUnit ?? "minute"} onChange={(event) => onConfigChange({ intervalUnit: event.target.value as "minute" | "hour" | "day" })}>
-              <option value="minute">分钟</option>
-              <option value="hour">小时</option>
-              <option value="day">天</option>
-            </select>
-          </label>
+          <IntervalInput
+            value={config.intervalValue ?? config.intervalMinutes ?? 1}
+            unit={config.intervalUnit ?? "minute"}
+            disabled={disabled}
+            onChange={(value) => onConfigChange({ intervalValue: value })}
+            onUnitChange={(intervalUnit) => onConfigChange({ intervalUnit })}
+          />
+          <MaxRunsInput value={maxRuns} disabled={disabled} onChange={onMaxRunsChange} />
         </>
       )}
-      {type === "hourly" && <NumberSelect label="分钟" value={config.minute ?? 0} min={0} max={59} onChange={(value) => onConfigChange({ minute: value })} />}
+      {type === "hourly" && <NumberSelect label="分钟" value={config.minute ?? 0} min={0} max={59} disabled={disabled} onChange={(value) => onConfigChange({ minute: value })} />}
       {(type === "daily" || type === "weekday" || type === "weekly" || type === "monthly") && (
         <>
-          {type === "weekly" && <MultiNumberSelect label="星期" values={config.weekdays ?? [1]} min={1} max={7} formatter={(value) => `周${["一", "二", "三", "四", "五", "六", "日"][value - 1]}`} onChange={(values) => onConfigChange({ weekdays: values })} />}
-          {type === "monthly" && <MultiNumberSelect label="日期" values={config.monthDays ?? [1]} min={1} max={31} formatter={(value) => `${value}日`} onChange={(values) => onConfigChange({ monthDays: values })} />}
-          <NumberSelect label="小时" value={config.hour ?? 9} min={0} max={23} onChange={(value) => onConfigChange({ hour: value })} />
-          <NumberSelect label="分钟" value={config.minute ?? 0} min={0} max={59} onChange={(value) => onConfigChange({ minute: value })} />
+          <TimeInput hour={config.hour ?? 9} minute={config.minute ?? 0} disabled={disabled} onChange={(hour, minute) => onConfigChange({ hour, minute })} />
         </>
       )}
+      </div>
+      {type === "weekly" && <MultiNumberSelect label="星期" values={config.weekdays ?? [1]} min={1} max={7} disabled={disabled} formatter={(value) => `周${["一", "二", "三", "四", "五", "六", "日"][value - 1]}`} onChange={(values) => onConfigChange({ weekdays: values })} />}
+      {type === "monthly" && <MultiNumberSelect label="日期" values={config.monthDays ?? [1]} min={1} max={31} disabled={disabled} formatter={(value) => `${value}日`} onChange={(values) => onConfigChange({ monthDays: values })} />}
     </div>
   );
 }
 
-function NumberSelect({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (value: number) => void }) {
+function TimeInput({ hour, minute, disabled = false, onChange }: { hour: number; minute: number; disabled?: boolean; onChange: (hour: number, minute: number) => void }) {
+  return (
+    <label className="scheduleTimeField">
+      <span>时间</span>
+      <input type="time" value={formatTimeInputValue(hour, minute)} onChange={(event) => {
+        const [nextHour, nextMinute] = parseTimeInputValue(event.target.value, hour, minute);
+        onChange(nextHour, nextMinute);
+      }} disabled={disabled} />
+    </label>
+  );
+}
+
+function IntervalInput({
+  value,
+  unit,
+  disabled = false,
+  onChange,
+  onUnitChange
+}: {
+  value: number;
+  unit: "minute" | "hour" | "day";
+  disabled?: boolean;
+  onChange: (value: number) => void;
+  onUnitChange: (unit: "minute" | "hour" | "day") => void;
+}) {
+  return (
+    <label className="scheduleIntervalField">
+      <span>固定间隔</span>
+      <span className="scheduleInlineControl">
+        <input type="number" min={1} value={value} onChange={(event) => onChange(Math.max(1, Math.floor(Number(event.target.value) || 1)))} disabled={disabled} aria-label="间隔数值" />
+        <select value={unit} onChange={(event) => onUnitChange(event.target.value as "minute" | "hour" | "day")} disabled={disabled} aria-label="间隔单位">
+          <option value="minute">分钟</option>
+          <option value="hour">小时</option>
+          <option value="day">天</option>
+        </select>
+      </span>
+    </label>
+  );
+}
+
+function MaxRunsInput({ value, disabled = false, onChange }: { value: number | null; disabled?: boolean; onChange: (value: number | null) => void }) {
+  return (
+    <label className="scheduleMaxRunsField">
+      <span>最多次数</span>
+      <input type="number" min={1} value={value ?? ""} placeholder="无限" onChange={(event) => onChange(event.target.value ? Math.max(1, Math.floor(Number(event.target.value))) : null)} disabled={disabled} />
+    </label>
+  );
+}
+
+function NumberSelect({ label, value, min, max, disabled = false, onChange }: { label: string; value: number; min: number; max: number; disabled?: boolean; onChange: (value: number) => void }) {
   return (
     <label>
       <span>{label}</span>
-      <select value={value} onChange={(event) => onChange(Number(event.target.value))}>
+      <select value={value} onChange={(event) => onChange(Number(event.target.value))} disabled={disabled}>
         {Array.from({ length: max - min + 1 }, (_, index) => min + index).map((item) => (
           <option key={item} value={item}>{String(item).padStart(2, "0")}</option>
         ))}
@@ -3546,18 +3876,19 @@ function NumberSelect({ label, value, min, max, onChange }: { label: string; val
   );
 }
 
-function NumberInput({ label, value, min, onChange }: { label: string; value: number; min: number; onChange: (value: number) => void }) {
+function NumberInput({ label, value, min, disabled = false, onChange }: { label: string; value: number; min: number; disabled?: boolean; onChange: (value: number) => void }) {
   return (
     <label>
       <span>{label}</span>
-      <input type="number" min={min} value={value} onChange={(event) => onChange(Math.max(min, Math.floor(Number(event.target.value) || min)))} />
+      <input type="number" min={min} value={value} onChange={(event) => onChange(Math.max(min, Math.floor(Number(event.target.value) || min)))} disabled={disabled} />
     </label>
   );
 }
 
-function MultiNumberSelect({ label, values, min, max, formatter, onChange }: { label: string; values: number[]; min: number; max: number; formatter: (value: number) => string; onChange: (values: number[]) => void }) {
+function MultiNumberSelect({ label, values, min, max, disabled = false, formatter, onChange }: { label: string; values: number[]; min: number; max: number; disabled?: boolean; formatter: (value: number) => string; onChange: (values: number[]) => void }) {
   const current = new Set(values);
   function toggle(value: number) {
+    if (disabled) return;
     const next = new Set(current);
     if (next.has(value) && next.size > 1) next.delete(value);
     else next.add(value);
@@ -3568,7 +3899,7 @@ function MultiNumberSelect({ label, values, min, max, formatter, onChange }: { l
       <span>{label}</span>
       <div>
         {Array.from({ length: max - min + 1 }, (_, index) => min + index).map((item) => (
-          <button key={item} type="button" className={current.has(item) ? "active" : ""} onClick={() => toggle(item)}>
+          <button key={item} type="button" className={current.has(item) ? "active" : ""} onClick={() => toggle(item)} disabled={disabled}>
             {formatter(item)}
           </button>
         ))}
@@ -4898,6 +5229,21 @@ function toDateTimeLocal(value?: string): string {
 
 function fromDateTimeLocal(value: string): string {
   return value ? new Date(value).toISOString() : "";
+}
+
+function formatTimeInputValue(hour: number, minute: number): string {
+  return `${clampTimePart(hour, 0, 23).toString().padStart(2, "0")}:${clampTimePart(minute, 0, 59).toString().padStart(2, "0")}`;
+}
+
+function parseTimeInputValue(value: string, fallbackHour: number, fallbackMinute: number): [number, number] {
+  const match = /^(\d{1,2}):(\d{1,2})$/.exec(value);
+  if (!match) return [fallbackHour, fallbackMinute];
+  return [clampTimePart(Number(match[1]), 0, 23), clampTimePart(Number(match[2]), 0, 59)];
+}
+
+function clampTimePart(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.floor(value)));
 }
 
 function mergeAttachments(current: LocalAttachment[], next: LocalAttachment[]): LocalAttachment[] {
