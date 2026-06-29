@@ -2471,6 +2471,7 @@ function startAutomationAttempt(task: AutomationTask, run: AutomationRun, attemp
   if (resourceWait) {
     const nextCheckAt = new Date(Date.now() + automationResourceCheckDelayMs).toISOString();
     db.scheduleAutomationRunResourceWait(run.id, { nextCheckAt, errorMessage: resourceWait.message });
+    db.appendAutomationRunExecutionHistory(run.id, { status: "waiting_resource", at: new Date().toISOString(), reason: resourceWait.message });
     logEvent("main.automation.dispatch:waitingResource", { requestId, runId: run.id, taskId: task.id, attemptCount, nextCheckAt, resource: resourceWait.resourceKey });
     emitAutomationChanged("run:waitingResource");
     rescheduleAutomationTimer();
@@ -2510,9 +2511,10 @@ function startAutomationAttempt(task: AutomationTask, run: AutomationRun, attemp
     agentName: session.agentName,
     config: readConfig(),
     automationRun: {
-      taskId: task.id,
-      runId: run.id,
-      attemptCount
+      automationTaskId: task.id,
+      automationTaskName: task.name,
+      automationRunId: run.id,
+      automationAttemptCount: attemptCount
     }
   };
   void prepareAutomationRequest(task, request, session)
@@ -2606,6 +2608,7 @@ function handleAutomationAgentEvent(event: AgentEvent): void {
     releaseConnectorResources(event.requestId);
     automationRequests.delete(event.requestId);
     db.completeSession(state.sessionId, { sdkSessionId: event.sdkSessionId, jsonlPath: event.sdkSessionId ? getExistingSessionJsonlPath(state.sessionId, event.sdkSessionId) ?? undefined : undefined, status: "completed" });
+    db.appendAutomationRunExecutionHistory(state.runId, { status: "succeeded", at: new Date().toISOString(), sessionId: state.sessionId });
     db.completeAutomationRun(state.runId, "succeeded");
     browserSessions.markIdle(state.sessionId);
     refreshRuntimeSession(state.sessionId);
@@ -2620,6 +2623,7 @@ function handleAutomationAgentEvent(event: AgentEvent): void {
     releaseConnectorResources(event.requestId);
     automationRequests.delete(event.requestId);
     db.updateStatus(state.sessionId, "failed");
+    db.appendAutomationRunExecutionHistory(state.runId, { status: "failed", at: new Date().toISOString(), sessionId: state.sessionId, reason: event.message });
     browserSessions.markIdle(state.sessionId);
     refreshRuntimeSession(state.sessionId);
     const run = db.getAutomationRun(state.runId);
@@ -2661,12 +2665,33 @@ function didAutomationIntervalPlanChange(existing: AutomationTask, input: Automa
 }
 
 async function handleAutomationToolRequest(request: AutomationToolRequest, context: AgentRunRequest): Promise<unknown> {
-  if (request.operation === "list") return db.listAutomationTasks();
+  if (request.operation === "run_current") {
+    if (!context.automationRun) throw new Error("当前不是自动化 run");
+    const run = db.getAutomationRun(context.automationRun.automationRunId);
+    if (!run) throw new Error("自动化 run 不存在");
+    return {
+      automationTaskId: context.automationRun.automationTaskId,
+      automationTaskName: context.automationRun.automationTaskName,
+      automationRunId: context.automationRun.automationRunId,
+      automationAttemptCount: context.automationRun.automationAttemptCount,
+      automationRun: automationRunForTool(run)
+    };
+  }
+  if (request.operation === "run_get") {
+    const id = automationToolRunId(request.input);
+    const run = db.getAutomationRun(id);
+    if (!run) throw new Error("自动化 run 不存在");
+    return automationRunForTool(run);
+  }
+  if (request.operation === "run_list") {
+    return db.listAutomationRunsFiltered(automationRunListInputFromTool(request.input)).map(automationRunForTool);
+  }
+  if (request.operation === "list") return db.listAutomationTasks().map(automationTaskForTool);
   if (request.operation === "get") {
     const id = automationToolTaskId(request.input);
     const task = db.getAutomationTask(id);
     if (!task) throw new Error("自动化任务不存在");
-    return task;
+    return automationTaskForTool(task);
   }
   if (request.operation === "delete") {
     const id = automationToolTaskId(request.input);
@@ -2675,11 +2700,11 @@ async function handleAutomationToolRequest(request: AutomationToolRequest, conte
     db.deleteAutomationTask(id);
     rescheduleAutomationTimer();
     emitAutomationChanged("tool:task:delete");
-    return { ok: true, id };
+    return { ok: true, automationTaskId: id };
   }
   if (request.operation === "pause" || request.operation === "resume") {
     const id = automationToolTaskId(request.input);
-    return setAutomationTaskEnabled(id, request.operation === "resume", `tool:task:${request.operation}`);
+    return automationTaskForTool(setAutomationTaskEnabled(id, request.operation === "resume", `tool:task:${request.operation}`));
   }
 
   const input = normalizeAutomationTaskInput(automationTaskInputFromTool(request.input, context));
@@ -2688,7 +2713,7 @@ async function handleAutomationToolRequest(request: AutomationToolRequest, conte
   const task = db.createAutomationTask(input, nextRunAt);
   rescheduleAutomationTimer();
   emitAutomationChanged("tool:task:create");
-  return task;
+  return automationTaskForTool(task);
 }
 
 async function handleConnectorToolRequest(request: ConnectorToolRequest, context: AgentRunRequest): Promise<unknown> {
@@ -2760,9 +2785,87 @@ function normalizeAgentPermissionResponseMode(response: AgentPermissionResponse)
 }
 
 function automationToolTaskId(input: unknown): number {
-  const id = Number(input && typeof input === "object" ? (input as { id?: unknown }).id : Number.NaN);
+  const id = Number(input && typeof input === "object" ? (input as { automationTaskId?: unknown }).automationTaskId : Number.NaN);
   if (!Number.isInteger(id) || id < 1) throw new Error("请输入有效的自动化任务 ID");
   return id;
+}
+
+function automationToolRunId(input: unknown): number {
+  const id = Number(input && typeof input === "object" ? (input as { automationRunId?: unknown }).automationRunId : Number.NaN);
+  if (!Number.isInteger(id) || id < 1) throw new Error("请输入有效的自动化 run ID");
+  return id;
+}
+
+function automationRunListInputFromTool(input: unknown): { taskId?: number; statuses?: AutomationRun["status"][]; limit?: number; offset?: number } {
+  if (input === undefined) return {};
+  if (!isPlainRecord(input)) throw new Error("run 查询参数格式不正确");
+  const result: { taskId?: number; statuses?: AutomationRun["status"][]; limit?: number; offset?: number } = {};
+  if (input.automationTaskId !== undefined) {
+    const taskId = Number(input.automationTaskId);
+    if (!Number.isInteger(taskId) || taskId < 1) throw new Error("请输入有效的自动化任务 ID");
+    result.taskId = taskId;
+  }
+  if (input.statuses !== undefined) {
+    if (!Array.isArray(input.statuses)) throw new Error("statuses 必须是数组");
+    result.statuses = Array.from(new Set(input.statuses.map((status) => {
+      if (status !== "running" && status !== "waiting_resource" && status !== "retrying" && status !== "succeeded" && status !== "failed") {
+        throw new Error(`不支持的 run 状态：${String(status)}`);
+      }
+      return status;
+    })));
+  }
+  if (input.limit !== undefined) {
+    const limit = Number(input.limit);
+    if (!Number.isInteger(limit)) throw new Error("limit 必须是整数");
+    result.limit = limit;
+  }
+  if (input.offset !== undefined) {
+    const offset = Number(input.offset);
+    if (!Number.isInteger(offset)) throw new Error("offset 必须是整数");
+    result.offset = offset;
+  }
+  return result;
+}
+
+function automationRunForTool(run: AutomationRun): Record<string, unknown> {
+  return {
+    automationRunId: run.id,
+    automationTaskId: run.taskId,
+    automationTaskName: run.taskName,
+    sessionId: run.sessionId,
+    scheduledAt: run.scheduledAt,
+    startedAt: run.startedAt,
+    endedAt: run.endedAt,
+    status: run.status,
+    automationAttemptCount: run.attemptCount,
+    maxAttempts: run.maxAttempts,
+    nextRetryAt: run.nextRetryAt,
+    errorMessage: run.errorMessage,
+    executionHistory: run.executionHistory,
+    createdAt: run.createdAt,
+    updatedAt: run.updatedAt
+  };
+}
+
+function automationTaskForTool(task: AutomationTask): Record<string, unknown> {
+  return {
+    automationTaskId: task.id,
+    automationTaskName: task.name,
+    description: task.description,
+    workspacePath: task.workspacePath,
+    scheduleType: task.scheduleType,
+    scheduleConfig: task.scheduleConfig,
+    maxRetries: task.maxRetries,
+    maxAutomationRuns: task.maxRuns,
+    automationRunCount: task.runCount,
+    connectorBindings: task.connectorBindings,
+    selectedSkills: task.selectedSkills,
+    attachments: task.attachments,
+    enabled: task.enabled,
+    nextRunAt: task.nextRunAt,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt
+  };
 }
 
 function automationTaskInputFromTool(value: unknown, context: AgentRunRequest): AutomationTaskInput {

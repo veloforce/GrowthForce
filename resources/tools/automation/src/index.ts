@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createSdkMcpServer, tool } from "../../runtime";
 import { z } from "zod/v4";
 
-type Operation = "list" | "get" | "create" | "pause" | "resume" | "delete";
+type Operation = "list" | "get" | "create" | "pause" | "resume" | "delete" | "run_current" | "run_get" | "run_list";
 type Response = { rpcId: string; ok: boolean; result?: unknown; error?: string };
 type ToolServerContext = { requestId?: string };
 
@@ -12,7 +12,21 @@ export function createServer(context?: ToolServerContext) {
     name: "automation",
     tools: [
       tool("automation_task_list", "查询全部自动化定时任务，不查询执行记录。", {}, async () => invoke(requestId, "list"), readAnnotations("定时任务 自动化 查询 列表")),
-      tool("automation_task_get", "按稳定 task ID 查询单个自动化定时任务。", { id: z.number().int().min(1) }, async (args) => invoke(requestId, "get", args), readAnnotations("定时任务 自动化 查询 详情")),
+      tool("automation_task_get", "按稳定 automationTaskId 查询单个自动化定时任务。", { automationTaskId: z.number().int().min(1) }, async (args) => invoke(requestId, "get", args), readAnnotations("定时任务 自动化 查询 详情")),
+      tool("automation_run_current", "查询当前自动化 run 的 automationTaskId 关系、automationAttemptCount 和完整历史执行记录。仅在自动化 run 内可用。", {}, async () => invoke(requestId, "run_current"), readAnnotations("自动化 run 当前 查询 历史 执行记录")),
+      tool("automation_run_get", "按稳定 automationRunId 查询单个自动化 run，包含完整历史执行记录。", { automationRunId: z.number().int().min(1) }, async (args) => invoke(requestId, "run_get", args), readAnnotations("自动化 run 查询 详情 历史 执行记录")),
+      tool(
+        "automation_run_list",
+        "分页查询自动化 run 列表，可按 automationTaskId 和状态过滤；按单个 automationRunId 查询请使用 automation_run_get。",
+        {
+          automationTaskId: z.number().int().min(1).optional(),
+          statuses: z.array(z.enum(["running", "waiting_resource", "retrying", "succeeded", "failed"])).optional(),
+          limit: z.number().int().min(1).max(100).optional(),
+          offset: z.number().int().min(0).optional()
+        },
+        async (args) => invoke(requestId, "run_list", args),
+        readAnnotations("自动化 run 查询 列表 历史 执行记录")
+      ),
       tool(
         "automation_task_create",
         "创建自动化定时任务。工作空间和账号自动继承当前 Agent Run；Skill 和附件仅使用显式传入的引用。",
@@ -35,9 +49,9 @@ export function createServer(context?: ToolServerContext) {
         async (args) => invoke(requestId, "create", args),
         writeAnnotations("定时任务 自动化 创建")
       ),
-      tool("automation_task_pause", "按稳定 task ID 暂停自动化定时任务，仅阻止后续计划触发。", { id: z.number().int().min(1) }, async (args) => invoke(requestId, "pause", args), stateAnnotations("定时任务 自动化 暂停")),
-      tool("automation_task_resume", "按稳定 task ID 重新开启自动化定时任务，并从当前时间重新计算下次执行时间。", { id: z.number().int().min(1) }, async (args) => invoke(requestId, "resume", args), stateAnnotations("定时任务 自动化 重新开启")),
-      tool("automation_task_delete", "按稳定 task ID 删除自动化定时任务，保留已有执行记录。", { id: z.number().int().min(1) }, async (args) => invoke(requestId, "delete", args), deleteAnnotations("定时任务 自动化 删除"))
+      tool("automation_task_pause", "按稳定 automationTaskId 暂停自动化定时任务，仅阻止后续计划触发。", { automationTaskId: z.number().int().min(1) }, async (args) => invoke(requestId, "pause", args), stateAnnotations("定时任务 自动化 暂停")),
+      tool("automation_task_resume", "按稳定 automationTaskId 重新开启自动化定时任务，并从当前时间重新计算下次执行时间。", { automationTaskId: z.number().int().min(1) }, async (args) => invoke(requestId, "resume", args), stateAnnotations("定时任务 自动化 重新开启")),
+      tool("automation_task_delete", "按稳定 automationTaskId 删除自动化定时任务，保留已有执行记录。", { automationTaskId: z.number().int().min(1) }, async (args) => invoke(requestId, "delete", args), deleteAnnotations("定时任务 自动化 删除"))
     ]
   });
 }

@@ -288,9 +288,10 @@ export interface AgentRunRequest {
 }
 
 export interface AutomationRunContext {
-  taskId: number;
-  runId: number;
-  attemptCount: number;
+  automationTaskId: number;
+  automationTaskName: string;
+  automationRunId: number;
+  automationAttemptCount: number;
 }
 
 export interface AgentSupplementQueueItem {
@@ -492,8 +493,16 @@ export interface AutomationRun {
   maxAttempts: number;
   nextRetryAt: string | null;
   errorMessage: string | null;
+  executionHistory: AutomationRunExecutionHistoryItem[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AutomationRunExecutionHistoryItem {
+  status: "succeeded" | "failed" | "waiting_resource";
+  at: string;
+  sessionId?: number;
+  reason?: string;
 }
 
 export interface AutomationTaskInput {
@@ -510,7 +519,7 @@ export interface AutomationTaskInput {
   enabled?: boolean;
 }
 
-export type AutomationToolOperation = "list" | "get" | "create" | "pause" | "resume" | "delete";
+export type AutomationToolOperation = "list" | "get" | "create" | "pause" | "resume" | "delete" | "run_current" | "run_get" | "run_list";
 
 export interface AutomationToolRequest {
   rpcId: string;

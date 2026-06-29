@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import initSqlJs, { type Database, type SqlJsStatic, type SqlValue } from "sql.js";
 import { randomUUID } from "node:crypto";
-import type { AutomationRun, AutomationRunStatus, AutomationTask, AutomationTaskInput, ConnectorAccount, ConnectorAccountOpsState, ConnectorAccountStatus, ConnectorPlatform, SessionOrigin, SessionRecord, SessionStatus } from "../shared/types";
+import type { AutomationRun, AutomationRunExecutionHistoryItem, AutomationRunStatus, AutomationTask, AutomationTaskInput, ConnectorAccount, ConnectorAccountOpsState, ConnectorAccountStatus, ConnectorPlatform, SessionOrigin, SessionRecord, SessionStatus } from "../shared/types";
 
 type SessionRow = Record<string, SqlValue>;
 
@@ -246,6 +246,30 @@ export class AppDatabase {
     `).map(mapAutomationRun);
   }
 
+  listAutomationRunsFiltered(input: { taskId?: number; statuses?: AutomationRunStatus[]; limit?: number; offset?: number } = {}): AutomationRun[] {
+    const conditions: string[] = [];
+    const params: SqlValue[] = [];
+    if (input.taskId !== undefined) {
+      conditions.push("runs.task_id = ?");
+      params.push(input.taskId);
+    }
+    if (input.statuses && input.statuses.length > 0) {
+      conditions.push(`runs.status IN (${input.statuses.map(() => "?").join(", ")})`);
+      params.push(...input.statuses);
+    }
+    const limit = clampInteger(input.limit ?? 20, 1, 100);
+    const offset = clampInteger(input.offset ?? 0, 0, 10_000);
+    params.push(limit, offset);
+    return this.selectRows(`
+      SELECT runs.*, COALESCE(tasks.name, runs.task_name_snapshot, '已删除任务') AS task_name
+      FROM automation_runs runs
+      LEFT JOIN automation_tasks tasks ON tasks.id = runs.task_id
+      ${conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : ""}
+      ORDER BY runs.created_at DESC, runs.id DESC
+      LIMIT ? OFFSET ?
+    `, params).map(mapAutomationRun);
+  }
+
   getAutomationRun(id: number): AutomationRun | null {
     const rows = this.selectRows(`
       SELECT runs.*, COALESCE(tasks.name, runs.task_name_snapshot, '已删除任务') AS task_name
@@ -294,6 +318,15 @@ export class AppDatabase {
   scheduleAutomationRunResourceWait(id: number, input: { nextCheckAt: string; errorMessage: string }): void {
     const now = new Date().toISOString();
     this.db.run("UPDATE automation_runs SET status = 'waiting_resource', next_retry_at = ?, error_message = ?, updated_at = ? WHERE id = ?", [input.nextCheckAt, input.errorMessage, now, id]);
+    this.persist();
+  }
+
+  appendAutomationRunExecutionHistory(id: number, item: AutomationRunExecutionHistoryItem): void {
+    const run = this.getAutomationRun(id);
+    if (!run) throw new Error("Automation run not found");
+    const now = new Date().toISOString();
+    const history = [...run.executionHistory, normalizeAutomationRunHistoryItem(item)];
+    this.db.run("UPDATE automation_runs SET execution_history = ?, updated_at = ? WHERE id = ?", [JSON.stringify(history), now, id]);
     this.persist();
   }
 
@@ -419,6 +452,7 @@ export class AppDatabase {
         max_attempts INTEGER NOT NULL DEFAULT 1,
         next_retry_at TEXT,
         error_message TEXT,
+        execution_history TEXT NOT NULL DEFAULT '[]',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       );
@@ -448,6 +482,7 @@ export class AppDatabase {
     this.ensureColumn("automation_tasks", "connector_bindings", "TEXT NOT NULL DEFAULT '{}'");
     this.ensureColumn("automation_tasks", "selected_skills", "TEXT NOT NULL DEFAULT '[]'");
     this.ensureColumn("automation_tasks", "attachments", "TEXT NOT NULL DEFAULT '[]'");
+    this.ensureColumn("automation_runs", "execution_history", "TEXT NOT NULL DEFAULT '[]'");
     const now = new Date().toISOString();
     this.db.run("UPDATE connector_accounts SET profile_key = COALESCE(NULLIF(profile_key, ''), COALESCE(NULLIF(account_id, ''), 'legacy_' || id)) WHERE profile_key IS NULL OR profile_key = ''");
     this.db.run("UPDATE connector_accounts SET created_at = COALESCE(NULLIF(created_at, ''), ?) WHERE created_at IS NULL OR created_at = ''", [now]);
@@ -463,6 +498,7 @@ export class AppDatabase {
     const row = this.selectRows("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'automation_runs'")[0];
     const sql = typeof row?.sql === "string" ? row.sql : "";
     if (sql.includes("waiting_resource")) return;
+    const hasExecutionHistory = this.hasColumn("automation_runs", "execution_history");
     this.db.run("ALTER TABLE automation_runs RENAME TO automation_runs_old_status_check");
     this.db.run(`
       CREATE TABLE automation_runs (
@@ -478,6 +514,7 @@ export class AppDatabase {
         max_attempts INTEGER NOT NULL DEFAULT 1,
         next_retry_at TEXT,
         error_message TEXT,
+        execution_history TEXT NOT NULL DEFAULT '[]',
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL
       )
@@ -485,14 +522,20 @@ export class AppDatabase {
     this.db.run(`
       INSERT INTO automation_runs (
         id, task_id, task_name_snapshot, session_id, scheduled_at, started_at, ended_at,
-        status, attempt_count, max_attempts, next_retry_at, error_message, created_at, updated_at
+        status, attempt_count, max_attempts, next_retry_at, error_message, execution_history, created_at, updated_at
       )
       SELECT
         id, task_id, task_name_snapshot, session_id, scheduled_at, started_at, ended_at,
-        status, attempt_count, max_attempts, next_retry_at, error_message, created_at, updated_at
+        status, attempt_count, max_attempts, next_retry_at, error_message, ${hasExecutionHistory ? "COALESCE(execution_history, '[]')" : "'[]'"}, created_at, updated_at
       FROM automation_runs_old_status_check
     `);
     this.db.run("DROP TABLE automation_runs_old_status_check");
+  }
+
+  private hasColumn(table: string, column: string): boolean {
+    return Boolean(this.db
+      .exec(`PRAGMA table_info(${table})`)[0]
+      ?.values.some((row) => row[1] === column));
   }
 
   private persist(): void {
@@ -518,10 +561,7 @@ export class AppDatabase {
   }
 
   private ensureColumn(table: string, column: string, definition: string): void {
-    const exists = this.db
-      .exec(`PRAGMA table_info(${table})`)[0]
-      ?.values.some((row) => row[1] === column);
-    if (!exists) this.db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    if (!this.hasColumn(table, column)) this.db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
 }
 
@@ -658,9 +698,28 @@ function mapAutomationRun(row: SessionRow): AutomationRun {
     maxAttempts: Number(row.max_attempts ?? 1),
     nextRetryAt: toNullableString(row.next_retry_at),
     errorMessage: toNullableString(row.error_message),
+    executionHistory: parseAutomationRunExecutionHistory(row.execution_history),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at)
   };
+}
+
+function parseAutomationRunExecutionHistory(value: SqlValue): AutomationRunExecutionHistoryItem[] {
+  const parsed = parseJson(value);
+  if (!Array.isArray(parsed)) return [];
+  return parsed.map(normalizeAutomationRunHistoryItem).filter(Boolean) as AutomationRunExecutionHistoryItem[];
+}
+
+function normalizeAutomationRunHistoryItem(value: unknown): AutomationRunExecutionHistoryItem {
+  const record = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const status = record.status === "succeeded" || record.status === "failed" || record.status === "waiting_resource" ? record.status : "failed";
+  const item: AutomationRunExecutionHistoryItem = {
+    status,
+    at: typeof record.at === "string" && record.at.trim() ? record.at : new Date().toISOString()
+  };
+  if (typeof record.sessionId === "number" && Number.isInteger(record.sessionId) && record.sessionId > 0) item.sessionId = record.sessionId;
+  if (typeof record.reason === "string" && record.reason.trim()) item.reason = record.reason.trim();
+  return item;
 }
 
 function parseScheduleConfig(value: SqlValue): AutomationTask["scheduleConfig"] {
@@ -680,4 +739,9 @@ function parseScheduleConfig(value: SqlValue): AutomationTask["scheduleConfig"] 
 
 function toNullableString(value: SqlValue): string | null {
   return value === null || value === undefined ? null : String(value);
+}
+
+function clampInteger(value: number, min: number, max: number): number {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(max, Math.max(min, Math.trunc(value)));
 }

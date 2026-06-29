@@ -904,14 +904,35 @@ const { calculateAutomationDispatchPlan, calculateNextRunAt, formatAutomationSch
   }
   const waitingRun = db.createAutomationRun({ task: automationTask, scheduledAt: "2026-06-03T00:00:00.000Z", status: "waiting_resource" });
   db.scheduleAutomationRunResourceWait(waitingRun.id, { nextCheckAt: "2026-06-03T00:00:30.000Z", errorMessage: "账号忙" });
+  db.appendAutomationRunExecutionHistory(waitingRun.id, { status: "waiting_resource", at: "2026-06-03T00:00:00.000Z", reason: "账号忙" });
   const dueContinuations = db.listDueAutomationRunContinuations("2026-06-03T00:00:31.000Z");
   if (!db.hasOpenAutomationRunForTask(automationTask.id) || dueContinuations[0]?.status !== "waiting_resource" || dueContinuations[0]?.attemptCount !== 0 || formatAutomationStatus("waiting_resource") !== "等待账号空闲") {
     throw new Error(`Expected waiting_resource automation run to be open and due without consuming attempts, got ${JSON.stringify(dueContinuations[0])}`);
+  }
+  const waitingHistory = db.getAutomationRun(waitingRun.id)?.executionHistory;
+  if (!waitingHistory || waitingHistory.length !== 1 || waitingHistory[0].status !== "waiting_resource" || waitingHistory[0].reason !== "账号忙" || Object.prototype.hasOwnProperty.call(waitingHistory[0], "attemptCount")) {
+    throw new Error(`Expected waiting_resource execution history without attemptCount, got ${JSON.stringify(waitingHistory)}`);
   }
   const missedResourceWaits = db.markOverdueAutomationResourceWaitsFailed("2026-06-03T00:00:31.000Z");
   const failedWaitingRun = db.getAutomationRun(waitingRun.id);
   if (missedResourceWaits !== 1 || failedWaitingRun?.status !== "failed" || failedWaitingRun.attemptCount !== 0 || failedWaitingRun.errorMessage !== "应用关闭期间错过账号资源等待") {
     throw new Error(`Expected overdue waiting_resource run to fail without attempts, got ${JSON.stringify(failedWaitingRun)}`);
+  }
+  const failedHistoryRun = db.createAutomationRun({ task: automationTask, scheduledAt: "2026-06-04T00:00:00.000Z" });
+  db.startAutomationRunAttempt(failedHistoryRun.id, { sessionId: 1001, attemptCount: 1 });
+  db.appendAutomationRunExecutionHistory(failedHistoryRun.id, { status: "failed", at: "2026-06-04T00:01:00.000Z", sessionId: 1001, reason: "执行失败" });
+  db.scheduleAutomationRunRetry(failedHistoryRun.id, { nextRetryAt: "2026-06-04T00:02:00.000Z", errorMessage: "执行失败" });
+  const succeededHistoryRun = db.createAutomationRun({ task: automationTask, scheduledAt: "2026-06-05T00:00:00.000Z" });
+  db.startAutomationRunAttempt(succeededHistoryRun.id, { sessionId: 1002, attemptCount: 1 });
+  db.appendAutomationRunExecutionHistory(succeededHistoryRun.id, { status: "succeeded", at: "2026-06-05T00:01:00.000Z", sessionId: 1002 });
+  db.completeAutomationRun(succeededHistoryRun.id, "succeeded");
+  const historyRun = db.getAutomationRun(failedHistoryRun.id);
+  if (historyRun?.executionHistory.length !== 1 || historyRun.executionHistory[0].status !== "failed" || historyRun.executionHistory[0].sessionId !== 1001 || historyRun.executionHistory[0].reason !== "执行失败") {
+    throw new Error(`Expected failed execution history to round-trip, got ${JSON.stringify(historyRun)}`);
+  }
+  const filteredRuns = db.listAutomationRunsFiltered({ taskId: automationTask.id, statuses: ["succeeded"], limit: 10, offset: 0 });
+  if (filteredRuns.length !== 1 || filteredRuns[0].id !== succeededHistoryRun.id || filteredRuns[0].executionHistory[0]?.status !== "succeeded") {
+    throw new Error(`Expected filtered automation runs to include succeeded history run, got ${JSON.stringify(filteredRuns)}`);
   }
   const firstDispatch = db.recordAutomationTaskDispatch(automationTask.id, "2026-06-05T00:00:00.000Z", true);
   const finalDispatch = db.recordAutomationTaskDispatch(automationTask.id, null, false);
@@ -1319,7 +1340,7 @@ const automationToolSource = fs.readFileSync(path.join("resources", "tools", "au
 const toolRegistrySource = fs.readFileSync(path.join("src", "agent", "tool-registry.ts"), "utf8");
 const agentRuntimeSource = fs.readFileSync(path.join("src", "agent", "agent.ts"), "utf8");
 const mainAutomationSource = fs.readFileSync(path.join("src", "main", "main.ts"), "utf8");
-for (const expected of ["automation_task_pause", "automation_task_resume", "selectedSkills: z.array", "attachmentPaths: z.array"]) {
+for (const expected of ["automation_task_pause", "automation_task_resume", "automation_run_current", "automation_run_get", "automation_run_list", "automationTaskId: z.number", "automationRunId: z.number", "selectedSkills: z.array", "attachmentPaths: z.array"]) {
   if (!automationToolSource.includes(expected)) throw new Error(`Expected automation tool source to include ${expected}`);
 }
 if (!automationToolSource.includes("context?.requestId") || automationToolSource.includes("process.env.AGENTSTUDIO_AGENT_REQUEST_ID")) {
@@ -1347,8 +1368,15 @@ if (agentRuntimeSource.includes("withScopedRuntimeEnv")) {
 if (mainAutomationSource.includes("selectedSkills: context.selectedSkills") || mainAutomationSource.includes("attachments: context.attachments")) {
   throw new Error("Expected automation tool creation not to inherit selected skills or attachments from the current Agent Run");
 }
-for (const expected of ["selectedSkills: resolveAutomationToolSkills", "attachments: resolveAutomationToolAttachments", 'request.operation === "pause" || request.operation === "resume"']) {
+for (const expected of ["selectedSkills: resolveAutomationToolSkills", "attachments: resolveAutomationToolAttachments", 'request.operation === "pause" || request.operation === "resume"', 'request.operation === "run_current"', "listAutomationRunsFiltered", "automationTaskForTool", "automationRunCount", "maxAutomationRuns"]) {
   if (!mainAutomationSource.includes(expected)) throw new Error(`Expected main automation tool handler to include ${expected}`);
+}
+const automationToolHandlerSource = mainAutomationSource.slice(
+  mainAutomationSource.indexOf("async function handleAutomationToolRequest"),
+  mainAutomationSource.indexOf("async function handleConnectorToolRequest")
+);
+for (const forbidden of ["return db.listAutomationTasks();", "return task;", "return setAutomationTaskEnabled(id"]) {
+  if (automationToolHandlerSource.includes(forbidden)) throw new Error(`Expected automation task tool responses to use automationTaskForTool instead of ${forbidden}`);
 }
 for (const exported of ["validateDraftPublishInput", "extractLocalImagePaths", "validatePublishedArticlesRequest", "normalizePublishedArticles"]) {
   if (typeof wechatOps[exported] !== "function") {
@@ -2056,11 +2084,16 @@ try {
       workspace: { defaultDir: "/tmp/workspace" },
       user: { name: "Smoke", avatar: "" }
     },
-    automationRun: { taskId: 12, runId: 34, attemptCount: 2 }
+    automationRun: { automationTaskId: 12, automationTaskName: "自动发布任务", automationRunId: 34, automationAttemptCount: 2 }
   }, promptNow);
-  for (const expected of ["当前是自动化任务运行", "taskId: 12；runId: 34；attempt: 2", "所有环节均按任务预授权执行，无需再次请求用户确认", "不要调用 `AskUserQuestion`", "不要只回复“等待用户确认”后停止"]) {
+  for (const expected of ["当前是自动化任务运行", "automationTaskId: 12", "automationTaskName: 自动发布任务", "automationRunId: 34", "automationAttemptCount: 2", "这是同一 run 的第 2 次执行尝试", "所有环节均按任务预授权执行，无需再次请求用户确认", "不要调用 `AskUserQuestion`", "不要只回复“等待用户确认”后停止"]) {
     if (!automationPrompt.includes(expected)) {
       throw new Error(`Expected automation prompt to include ${expected}:\n${automationPrompt}`);
+    }
+  }
+  for (const forbidden of ["automation_run_current", "automation_run_get", "automation_run_list", "自动化任务 taskId", "自动化 runId", "当前 attemptCount", "计划触发时间", "最大执行尝试次数"]) {
+    if (automationPrompt.includes(forbidden)) {
+      throw new Error(`Expected automation prompt not to include ${forbidden}:\n${automationPrompt}`);
     }
   }
 

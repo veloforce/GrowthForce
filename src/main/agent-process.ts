@@ -198,7 +198,7 @@ function getAutomationToolRequest(value: unknown): AutomationToolRequest | null 
   if (message.type !== "automationToolRequest" || !message.payload || typeof message.payload !== "object") return null;
   const payload = message.payload as Partial<AutomationToolRequest>;
   if (typeof payload.rpcId !== "string" || typeof payload.requestId !== "string") return null;
-  if (payload.operation !== "list" && payload.operation !== "get" && payload.operation !== "create" && payload.operation !== "pause" && payload.operation !== "resume" && payload.operation !== "delete") return null;
+  if (payload.operation !== "list" && payload.operation !== "get" && payload.operation !== "create" && payload.operation !== "pause" && payload.operation !== "resume" && payload.operation !== "delete" && payload.operation !== "run_current" && payload.operation !== "run_get" && payload.operation !== "run_list") return null;
   return payload as AutomationToolRequest;
 }
 

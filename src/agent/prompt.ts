@@ -12,7 +12,11 @@ export function composePrompt(request: AgentRunRequest, now = new Date()): strin
   if (request.automationRun) {
     sections.push(wrapSystemReminder([
       "当前是自动化任务运行，不是用户前台手动对话。",
-      `- taskId: ${request.automationRun.taskId}；runId: ${request.automationRun.runId}；attempt: ${request.automationRun.attemptCount}`,
+      `- automationTaskId: ${request.automationRun.automationTaskId}`,
+      `- automationTaskName: ${request.automationRun.automationTaskName}`,
+      `- automationRunId: ${request.automationRun.automationRunId}`,
+      `- automationAttemptCount: ${request.automationRun.automationAttemptCount}`,
+      `- automationRunId 属于上述 automationTaskId；${request.automationRun.automationAttemptCount === 1 ? "这是该自动化任务 run 的第一次执行。" : `这是同一 run 的第 ${request.automationRun.automationAttemptCount} 次执行尝试。`}`,
       "- 所有环节均按任务预授权执行，无需再次请求用户确认。",
       "- 不要调用 `AskUserQuestion`，也不要只回复“等待用户确认”后停止。",
       "- 遇到发布、评论、互动等通常需要确认的步骤时，在自动化上下文中直接按任务描述和已绑定账号继续；如果缺少硬依赖或安全条件不满足，则明确失败并说明原因。"
