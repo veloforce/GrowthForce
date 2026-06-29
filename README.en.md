@@ -15,22 +15,8 @@
 </p>
 
 <p align="center">
-  <a href="./README.md">中文</a> · <a href="#product-screenshots">Product Screenshots</a> · <a href="#quick-start">Quick Start</a> · <a href="#core-advantages">Core Advantages</a> · <a href="#vision--collaboration">Vision & Collaboration</a>
+  <a href="./README.md">中文</a> · <a href="#quick-start">Quick Start</a> · <a href="#product-screenshots">Product Screenshots</a> · <a href="#core-advantages">Core Advantages</a> · <a href="#vision--collaboration">Vision & Collaboration</a>
 </p>
-
----
-
-## Product Screenshots
-
-![GrowthForce home conversation workspace](./docs/image/home.png)
-
-![GrowthForce content publishing conversation](./docs/image/chat.png)
-
-![GrowthForce connector settings](./docs/image/connector.png)
-
-![GrowthForce plugins and skills management](./docs/image/skill.jpg)
-
-![GrowthForce automation task configuration](./docs/image/automation.png)
 
 ---
 
@@ -103,6 +89,20 @@ Just tell the AI what you want to do:
 > "Publish to my Xiaohongshu account, schedule for 6pm tomorrow"
 
 > "How did last week's content perform? Which post did best?"
+
+---
+
+## Product Screenshots
+
+![GrowthForce home conversation workspace](https://cdn.jsdelivr.net/gh/veloforce/GrowthForce@main/docs/image/home.png)
+
+![GrowthForce content publishing conversation](https://cdn.jsdelivr.net/gh/veloforce/GrowthForce@main/docs/image/chat.png)
+
+![GrowthForce connector settings](https://cdn.jsdelivr.net/gh/veloforce/GrowthForce@main/docs/image/connector.png)
+
+![GrowthForce plugins and skills management](https://cdn.jsdelivr.net/gh/veloforce/GrowthForce@main/docs/image/skill.jpg)
+
+![GrowthForce automation task configuration](https://cdn.jsdelivr.net/gh/veloforce/GrowthForce@main/docs/image/automation.png)
 
 ---
 
