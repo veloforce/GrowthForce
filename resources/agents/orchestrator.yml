@@ -95,3 +95,7 @@ disallowedTools:
   - WebSearch
   - WebFetch
   - NotebookEdit
+  - CronCreate
+  - CronList
+  - CronDelete
+  - ScheduleWakeup

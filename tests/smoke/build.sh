@@ -228,6 +228,9 @@ for (const envName of ["WECHAT_APPID", "WECHAT_SECRET", "WECHAT_AUTHOR"]) {
     throw new Error(`Expected agent scoped runtime env to include ${envName}`);
   }
 }
+if (!agentSource.includes('CLAUDE_CODE_DISABLE_CRON: "1"')) {
+  throw new Error("Expected agent env builder to disable Claude Code scheduled tasks");
+}
 if (!agentSource.includes('toolConfig: { askUserQuestion: { previewFormat: "markdown" } }')) {
   throw new Error("Expected canUseTool AskUserQuestion preview to request markdown format");
 }

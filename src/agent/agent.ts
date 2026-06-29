@@ -357,6 +357,7 @@ function buildAgentEnv(request: AgentRunRequest): Record<string, string | undefi
   const provider = request.config.provider;
   return {
     ...process.env,
+    CLAUDE_CODE_DISABLE_CRON: "1",
     CLAUDE_AGENT_SDK_CLIENT_APP: "GrowthForce",
     CLAUDE_CONFIG_DIR: getDefaultAgentConfigDir(request.agentName),
     ANTHROPIC_API_KEY: provider.apiKey || process.env.ANTHROPIC_API_KEY,
