@@ -291,8 +291,11 @@ const devScriptSource = fs.readFileSync(path.join("scripts", "dev.sh"), "utf8");
 if (!devScriptSource.includes("resources/connectors/xhs/bin/darwin/x64/xhs-cli/xhs-cli") || !devScriptSource.includes("resources/connectors/xhs/bin/win32/x64/xhs-cli/xhs-cli.exe")) {
   throw new Error("Expected dev script to check the XHS onedir executable");
 }
-if (!devScriptSource.includes('npm run build:xhs-sidecar') || !devScriptSource.includes('if [ ! -x "$XHS_SIDECAR" ]; then')) {
-  throw new Error("Expected dev script to build a missing XHS sidecar automatically and verify the executable");
+if (!devScriptSource.includes('npm run build:xhs-sidecar') || !devScriptSource.includes('needs_xhs_sidecar_build "$XHS_SIDECAR"')) {
+  throw new Error("Expected dev script to build a missing or stale XHS sidecar automatically and verify the executable");
+}
+if (!devScriptSource.includes('-newer "$sidecar"') || !devScriptSource.includes("XHS sidecar is older than connector source")) {
+  throw new Error("Expected dev script to rebuild the XHS sidecar when connector source is newer");
 }
 if (!devScriptSource.includes('AGENTSTUDIO_XHS_ALLOW_SOURCE_CLI:-') || !devScriptSource.includes('Skipping automatic XHS sidecar build')) {
   throw new Error("Expected dev script to preserve the explicit Python source CLI escape hatch");

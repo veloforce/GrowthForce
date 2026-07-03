@@ -933,7 +933,7 @@ def cmd_publish_video(args: argparse.Namespace) -> None:
 
     browser, page = _connect_checked(args)
     try:
-        publish_video_content(
+        result = publish_video_content(
             page,
             PublishVideoContent(
                 title=preflight.title,
@@ -944,7 +944,7 @@ def cmd_publish_video(args: argparse.Namespace) -> None:
                 visibility=args.visibility or "",
             ),
         )
-        _output({"success": True, "title": preflight.title, "video": preflight.video or args.video, "status": "发布完成"})
+        _output({**result, "title": preflight.title, "video": preflight.video or args.video})
     finally:
         browser.close()
 

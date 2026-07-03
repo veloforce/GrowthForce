@@ -759,9 +759,11 @@ def _input_tags(page: Page, content_selector: str, tags: list[str]) -> None:
 
     # 先记录当前段落数（insertParagraph 之前），之后用于精确定位正文最后一段
     # 注意：必须在 insertParagraph 之前记录，否则 para_count_before 会包含新增的 tags 行
-    para_count_before = int(page.evaluate(
-        f'document.querySelector("{content_selector}").querySelectorAll("p").length'
-    ) or 1)
+    content_selector, para_count_before = _resolve_content_selector_for_tags(page, content_selector)
+
+    if _is_prosemirror_editor(page, content_selector):
+        _input_prosemirror_tags(page, content_selector, tags)
+        return
 
     # 用 evaluate 直接 focus 编辑器、光标移到末尾并换行一次
     # 避免 click_element 因 isTrusted=false 无法真正 focus Quill 编辑器的问题
@@ -810,6 +812,114 @@ def _input_tags(page: Page, content_selector: str, tags: list[str]) -> None:
         """
     )
     time.sleep(0.3)
+
+
+def _resolve_content_selector_for_tags(page: Page, content_selector: str) -> tuple[str, int]:
+    """确保标签输入前正文编辑器 selector 仍有效。"""
+    state = _get_content_editor_state(page, content_selector)
+    if state.get("found"):
+        return content_selector, int(state.get("paragraphCount") or 1)
+
+    logger.warning("正文编辑器 selector 已失效，尝试重新定位: %s", content_selector)
+    try:
+        refreshed_selector = _find_content_element(page)
+    except PublishError as e:
+        raise PublishError(f"没有找到内容输入框，无法输入标签: {content_selector}") from e
+
+    state = _get_content_editor_state(page, refreshed_selector)
+    if state.get("found"):
+        logger.info("已重新定位正文编辑器用于标签输入: %s", refreshed_selector)
+        return refreshed_selector, int(state.get("paragraphCount") or 1)
+
+    raise PublishError(f"没有找到内容输入框，无法输入标签: {refreshed_selector}")
+
+
+def _get_content_editor_state(page: Page, selector: str) -> dict:
+    """读取正文编辑器状态，避免 selector 失效时抛 JS 空指针。"""
+    state = page.evaluate(
+        f"""
+        (() => {{
+            const selector = {json.dumps(selector, ensure_ascii=False)};
+            const el = document.querySelector(selector);
+            if (!el) {{
+                return {{
+                    found: false,
+                    selector,
+                    url: location.href
+                }};
+            }}
+            return {{
+                found: true,
+                selector,
+                paragraphCount: Math.max(el.querySelectorAll("p").length, 1),
+                url: location.href
+            }};
+        }})()
+        """
+    )
+    return state if isinstance(state, dict) else {"found": False, "selector": selector}
+
+
+def _is_prosemirror_editor(page: Page, selector: str) -> bool:
+    """当前新版发布页正文编辑器是 tiptap/ProseMirror。"""
+    return page.evaluate(
+        f"""
+        (() => {{
+            const el = document.querySelector({json.dumps(selector, ensure_ascii=False)});
+            return Boolean(el && (
+                el.classList.contains("ProseMirror")
+                || el.classList.contains("tiptap")
+                || el.matches('.ProseMirror[contenteditable="true"]')
+            ));
+        }})()
+        """
+    ) is True
+
+
+def _input_prosemirror_tags(page: Page, content_selector: str, tags: list[str]) -> None:
+    """在 ProseMirror 编辑器末尾插入 hashtag 文本并校验。"""
+    normalized_tags = [tag.lstrip("#").strip() for tag in tags if tag.lstrip("#").strip()]
+    if not normalized_tags:
+        return
+
+    tag_text = " ".join(f"#{tag}" for tag in normalized_tags)
+    page.evaluate(
+        f"""
+        (() => {{
+            const el = document.querySelector({json.dumps(content_selector, ensure_ascii=False)});
+            if (!el) throw new Error('元素不存在: ' + {json.dumps(content_selector, ensure_ascii=False)});
+            el.focus();
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }})()
+        """
+    )
+    time.sleep(0.2)
+    page._send_session("Input.insertText", {"text": f"\n{tag_text}"})
+    time.sleep(1)
+
+    missing = _get_missing_tags_from_editor(page, content_selector, normalized_tags)
+    if missing:
+        raise PublishError(f"标签输入失败，未进入正文编辑器: {', '.join(missing)}")
+    logger.info("ProseMirror 标签输入完成: %s", ", ".join(normalized_tags))
+
+
+def _get_missing_tags_from_editor(page: Page, content_selector: str, tags: list[str]) -> list[str]:
+    """返回没有出现在正文编辑器文本中的标签。"""
+    state = page.evaluate(
+        f"""
+        (() => {{
+            const el = document.querySelector({json.dumps(content_selector, ensure_ascii=False)});
+            return el ? (el.innerText || el.textContent || '') : null;
+        }})()
+        """
+    )
+    text = state if isinstance(state, str) else ""
+    return [tag for tag in tags if f"#{tag}" not in text]
 
 
 def _input_single_tag(page: Page, content_selector: str, tag: str) -> None:

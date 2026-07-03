@@ -40,11 +40,23 @@ case "$(uname -s)-$(uname -m)" in
     ;;
 esac
 
-if [ -n "$XHS_SIDECAR" ] && [ ! -x "$XHS_SIDECAR" ]; then
+needs_xhs_sidecar_build() {
+  local sidecar="$1"
+  if [ ! -x "$sidecar" ]; then
+    return 0
+  fi
+  find "$ROOT_DIR/resources/connectors/xhs/engine/scripts" -type f -name '*.py' -newer "$sidecar" -print -quit | grep -q .
+}
+
+if [ -n "$XHS_SIDECAR" ] && needs_xhs_sidecar_build "$XHS_SIDECAR"; then
   if [ "${AGENTSTUDIO_XHS_ALLOW_SOURCE_CLI:-}" = "1" ]; then
     echo "Skipping automatic XHS sidecar build because AGENTSTUDIO_XHS_ALLOW_SOURCE_CLI=1."
   else
-    echo "Missing XHS sidecar: $XHS_SIDECAR"
+    if [ ! -x "$XHS_SIDECAR" ]; then
+      echo "Missing XHS sidecar: $XHS_SIDECAR"
+    else
+      echo "XHS sidecar is older than connector source: $XHS_SIDECAR"
+    fi
     echo "Checking for Python 3.11+ and building the XHS sidecar..."
     npm run build:xhs-sidecar
     if [ ! -x "$XHS_SIDECAR" ]; then
