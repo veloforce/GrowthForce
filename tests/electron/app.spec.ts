@@ -3,6 +3,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { AppDatabase } from "../../src/main/database";
 
 function writeCompleteConfig(homeDir: string): void {
   const agentStudioDir = path.join(homeDir, ".agentstudio");
@@ -948,6 +949,97 @@ test("background browser runtime stays detached while right panel is closed", as
   }
 });
 
+test("workbench keeps browser and artifact entry points independent", async () => {
+  test.setTimeout(60_000);
+  const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "growthforce-right-panel-"));
+  const agentStudioDir = path.join(homeDir, ".agentstudio");
+  const workspaceDir = path.join(agentStudioDir, "workspace");
+  const artifactPath = path.join(workspaceDir, "right-panel.md");
+  const jsonlPath = path.join(agentStudioDir, "right-panel.jsonl");
+  fs.mkdirSync(workspaceDir, { recursive: true });
+  writeCompleteConfig(homeDir);
+  fs.writeFileSync(artifactPath, "# Right panel artifact\n\n真实文档预览。\n", "utf8");
+
+  const database = await AppDatabase.open(path.join(agentStudioDir, "agentstudio.sqlite"));
+  const session = database.createSession({
+    prompt: "右侧面板入口测试",
+    workspacePath: workspaceDir
+  });
+  database.updateSdkSessionId(session.id, "right-panel-sdk-session");
+  database.updateJsonlPath(session.id, jsonlPath);
+  database.completeSession(session.id, { status: "completed" });
+  fs.writeFileSync(jsonlPath, [
+    JSON.stringify({
+      type: "user",
+      uuid: "right-panel-user",
+      message: { role: "user", content: "生成右侧面板测试文档" }
+    }),
+    JSON.stringify({
+      type: "assistant",
+      uuid: "right-panel-assistant",
+      message: {
+        role: "assistant",
+        content: [{
+          type: "tool_use",
+          id: "right-panel-write",
+          name: "Write",
+          input: { file_path: artifactPath, content: "# Right panel artifact" }
+        }]
+      }
+    }),
+    JSON.stringify({
+      type: "user",
+      uuid: "right-panel-result",
+      message: {
+        role: "user",
+        content: [{ type: "tool_result", tool_use_id: "right-panel-write", content: "created" }]
+      }
+    })
+  ].join("\n") + "\n", "utf8");
+
+  const app = await electron.launch({
+    args: [path.resolve(__dirname, "../..")],
+    env: { ...process.env, HOME: homeDir, VITE_DEV_SERVER_URL: "" }
+  });
+
+  try {
+    const page = await app.firstWindow();
+    const browserButton = page.getByRole("button", { name: "开始对话后可打开内置浏览器" });
+    await expect(browserButton).toBeVisible();
+    await expect(browserButton).toBeDisabled();
+
+    await page.locator(".sessionItem", { hasText: "右侧面板入口测试" }).click();
+    await expect(page.getByRole("button", { name: "打开内置浏览器" })).toBeEnabled();
+    const artifactButton = page.getByRole("button", { name: "right-panel.md Markdown" });
+    await artifactButton.click();
+    await expect(page.locator(".rightPanel.open")).toHaveCount(1);
+    await expect(page.getByRole("heading", { name: "Right panel artifact" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "打开内置浏览器" })).toBeVisible();
+
+    await page.getByRole("button", { name: "打开内置浏览器" }).click();
+    await expect(page.getByRole("button", { name: "折叠内置浏览器" })).toBeVisible();
+    await expect.poll(async () => app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      return window?.contentView.children.length ?? 0;
+    })).toBe(1);
+
+    await page.getByRole("button", { name: "折叠内置浏览器" }).click();
+    await expect(page.locator(".rightPanel.open")).toHaveCount(0);
+    await expect.poll(async () => app.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      return window?.contentView.children.length ?? 0;
+    })).toBe(0);
+
+    await artifactButton.click();
+    await expect(page.getByRole("heading", { name: "Right panel artifact" })).toBeVisible();
+    await page.getByRole("button", { name: "折叠右侧面板" }).click();
+    await expect(page.locator(".rightPanel.open")).toHaveCount(0);
+  } finally {
+    await app.close();
+    fs.rmSync(homeDir, { recursive: true, force: true });
+  }
+});
+
 test("closing app during a submitted turn does not send IPC to destroyed webContents", async () => {
   test.setTimeout(60_000);
   const homeDir = fs.mkdtempSync(path.join(os.tmpdir(), "agentstudio-close-during-turn-"));
@@ -1117,21 +1209,14 @@ test("built Electron app opens workbench and handles a submitted turn", async ()
     await expect(page.locator(".rightPanel.open")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "设置", exact: true })).toHaveCount(0);
     await expect(page.locator(".topActions").getByTitle("新会话")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "打开右侧面板" })).toBeVisible();
-    await expect(page.getByText("小G")).toBeVisible();
+    await expect(page.getByRole("button", { name: "开始对话后可打开内置浏览器" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "开始对话后可打开内置浏览器" })).toBeDisabled();
+    await expect(page.getByText("小G · GrowthForce", { exact: true })).toBeVisible();
     await expect(page.getByText("我是小G")).toBeVisible();
     await expect(page.getByPlaceholder("尽管问")).toBeVisible();
     await expect(page.getByTitle("添加")).toBeVisible();
     await expect(page.locator(".permissionPicker")).toBeVisible();
     await expect(page.locator(".quickGrid button")).toHaveCount(4);
-
-    await page.getByRole("button", { name: "打开右侧面板" }).click();
-    await expect(page.locator(".rightPanel.open")).toHaveCount(1);
-    await expect(page.getByRole("button", { name: "打开右侧面板" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "隐藏右侧面板" })).toBeVisible();
-    await page.getByRole("button", { name: "隐藏右侧面板" }).click();
-    await expect(page.locator(".rightPanel.open")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "打开右侧面板" })).toBeVisible();
 
     await page.locator(".workspacePicker").click();
     await expect(page.locator(".workspaceMenu")).toBeVisible();
@@ -1192,11 +1277,11 @@ test("built Electron app opens workbench and handles a submitted turn", async ()
     expect(expandButtonBox!.x).toBeGreaterThanOrEqual(collapsedWorkspaceBox!.x);
     expect(expandButtonBox!.x).toBeLessThan(collapsedWorkspaceBox!.x + 80);
     await page.getByRole("button", { name: "展开左侧栏" }).click();
-    await expect(page.getByText("小G")).toBeVisible();
+    await expect(page.getByText("小G · GrowthForce", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "插件和技能" }).click();
     await expect(page.locator(".rightPanel.open")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "隐藏右侧面板" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "折叠右侧面板" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "最大化右侧面板" })).toHaveCount(0);
     await expect(page.locator(".topbar")).toHaveCSS("border-bottom-color", "rgba(0, 0, 0, 0)");
     await expect(page.getByRole("button", { name: "技能市场" })).toBeVisible();
@@ -1216,7 +1301,7 @@ test("built Electron app opens workbench and handles a submitted turn", async ()
     await page.getByRole("button", { name: "技能市场" }).click();
 
     await page.getByRole("button", { name: /baoyu-comic/ }).click();
-    await expect(page.getByRole("button", { name: "隐藏右侧面板" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "折叠右侧面板" })).toBeVisible();
     await expect(page.getByRole("button", { name: "最大化右侧面板" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "元信息" })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByRole("heading", { name: "Frontmatter" })).toHaveCount(0);
@@ -1271,7 +1356,7 @@ test("built Electron app opens workbench and handles a submitted turn", async ()
     expect(topbarBox).not.toBeNull();
     await page.mouse.click(topbarBox!.x + topbarBox!.width / 2, topbarBox!.y + topbarBox!.height / 2);
     await expect(page.locator(".rightPanel.open")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "隐藏右侧面板" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "折叠右侧面板" })).toHaveCount(0);
 
     await page.getByRole("button", { name: /baoyu-comic/ }).click();
     await expect(page.locator(".rightPanel.open")).toHaveCount(1);

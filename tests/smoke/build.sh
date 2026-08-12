@@ -264,9 +264,17 @@ if (rendererSource.includes("alwaysAllow")) {
 if (!agentPromptSource.includes("本轮可以使用 GrowthForce 小红书连接器") || !agentPromptSource.includes("调用任何 `xhs-*` Skill") || !agentPromptSource.includes("check-session") || !agentPromptSource.includes("180000ms") || !agentPromptSource.includes("AGENTSTUDIO_XHS_ACCOUNT_ID")) {
   throw new Error("Expected XHS connector system reminder to require check-session before xhs-* skills and business commands");
 }
-for (const expected of ["当前是自动化任务运行", "所有环节均按任务预授权执行，无需再次请求用户确认", "不要调用 `AskUserQuestion`", "不要只回复“等待用户确认”后停止"]) {
+for (const expected of ["当前是自动化任务运行", "本轮预授权仅覆盖任务描述、附件或上游产物中已经明确给定的目标、动作与适用的对外内容", "不要调用 `AskUserQuestion`", "不要只回复“等待用户确认”后停止"]) {
   if (!agentPromptSource.includes(expected)) {
     throw new Error(`Expected automation system reminder to include ${expected}`);
+  }
+}
+if (agentPromptSource.includes("所有环节均按任务预授权执行")) {
+  throw new Error("Expected automation reminder not to claim blanket preauthorization");
+}
+for (const expected of ["作为优先参考", "任务适用时优先采用", "不适用时可以跳过", "不限制调用完成任务所需的其他 Skill"]) {
+  if (!agentPromptSource.includes(expected)) {
+    throw new Error(`Expected selected Skill reminder semantics: ${expected}`);
   }
 }
 
@@ -442,8 +450,8 @@ for (const skillName of ["xhs-explore", "xhs-interact", "xhs-publish"]) {
   if (!skillSource.includes("check-session")) {
     throw new Error(`Expected ${skillName} to allow check-session`);
   }
-  if (!skillSource.includes("XHS 前置登录检查规则")) {
-    throw new Error(`Expected ${skillName} to reference the shared XHS preflight rule`);
+  if (!skillSource.includes("XHS runtime guard") || !skillSource.includes("前置登录检查规则")) {
+    throw new Error(`Expected ${skillName} to reference the shared XHS runtime guard`);
   }
   if (skillSource.includes("$AGENTSTUDIO_XHS_CLI check-session")) {
     throw new Error(`Expected ${skillName} not to duplicate full check-session command details`);
@@ -481,20 +489,30 @@ if (!browserToolSource.includes("多个 web_search 必须顺序调用，不支�
   throw new Error("Expected web_search tool description to require sequential calls");
 }
 
-// content-lifecycle-ops 已解散：总原则上提 orchestrator.yml，执行细节下沉各阶段 Skill。
+// content-lifecycle-ops 已解散：业务政策上提 orchestrator.yml，执行细节下沉各阶段 Skill。
 const dissolvedLifecycleDir = path.join("resources", "skills", "orchestrator", "content-lifecycle-ops");
 if (fs.existsSync(dissolvedLifecycleDir)) {
   throw new Error("Expected dissolved content-lifecycle-ops skill to be removed");
 }
 const orchestratorAgentSource = fs.readFileSync(path.join("resources", "agents", "orchestrator.yml"), "utf8");
-for (const expected of ["xhs-create -> xhs-publish", "不得只回复发布包就停止", "只生成发布包或不发布"]) {
+for (const expected of ["内容生成并形成完整发布包后必须继续进入发布阶段", "用户明确要求草稿、内容、建议、发布包或不发布", "每个阶段交给对应 Skill 执行"]) {
   if (!orchestratorAgentSource.includes(expected)) {
-    throw new Error(`Expected orchestrator prompt to document XHS create-to-publish handoff: ${expected}`);
+    throw new Error(`Expected orchestrator prompt to document business-stage handoff: ${expected}`);
   }
 }
-for (const expected of ["四阶段闭环", "三条铁律", "写收口、读分散", "单篇不转正", "不编造指标", "必备记录层", "create 阶段产出"]) {
+for (const expected of ["账号基础 → 研究与策略 → 内容生成与校验 → 发布 → 互动与采集 → 复盘沉淀", "Profile 是用户确认的账号事实", "单篇表现只能积累候选规律", "不编造指标", "发布成功后才能进入数据采集和复盘"]) {
   if (!orchestratorAgentSource.includes(expected)) {
     throw new Error(`Expected orchestrator world-view to include: ${expected}`);
+  }
+}
+for (const expected of ["最终产生外部副作用的发布或互动 Skill 是授权的唯一执行方", "公众号当前只推送草稿箱", "自动化任务只可执行任务描述、附件或上游产物中已经明确给定并预授权的目标、动作与适用的"]) {
+  if (!orchestratorAgentSource.includes(expected)) {
+    throw new Error(`Expected orchestrator to own business-level authorization policy: ${expected}`);
+  }
+}
+for (const executionDetail of ["AskUserQuestion", "click-publish", "XHS_RISK_", "content_profile_get", "$AGENTSTUDIO_XHS_CLI"]) {
+  if (orchestratorAgentSource.includes(executionDetail)) {
+    throw new Error(`Expected execution detail to stay out of orchestrator.yml: ${executionDetail}`);
   }
 }
 for (const movedRuntimeRule of ["小红书连接器使用规范", "$AGENTSTUDIO_XHS_CLI check-session", "Chrome 扩展 Bridge"]) {
@@ -517,11 +535,19 @@ for (const skillName of [
   "wechat-create",
   "wechat-markdown-to-html",
   "wechat-publish",
-  "xhs-create"
+  "xhs-create",
+  "xhs-explore",
+  "xhs-interact",
+  "xhs-publish"
 ]) {
   const source = fs.readFileSync(path.join("resources", "skills", "orchestrator", skillName, "SKILL.md"), "utf8");
   if (!source.includes(`name: ${skillName}`)) {
     throw new Error(`Expected stage skill frontmatter name: ${skillName}`);
+  }
+  for (const section of ["## 职责", "## 授权"]) {
+    if (!source.includes(section)) {
+      throw new Error(`Expected ${skillName} to include stage skill contract section: ${section}`);
+    }
   }
 }
 // content-review-ops 是 playbook/history 的唯一写者，并承载转正/衰减纪律
@@ -555,7 +581,7 @@ for (const forbidden of ["content_playbook_write", "content_history_write"]) {
   }
 }
 const accountProfileSkillSource = fs.readFileSync(path.join("resources", "skills", "orchestrator", "account-profile-ops", "SKILL.md"), "utf8");
-for (const expected of ["未选择内容账号时不要触发", "content_profile_get", "已有定位且足以完成本轮任务时直接使用", "公众号使用当前连接器 APPID", "AskUserQuestion", "自动化任务不得调用", "说明缺失及跳过内容"]) {
+for (const expected of ["未选择内容账号时不要触发", "content_profile_get", "已有定位且足以完成本轮任务时直接使用", "公众号使用当前连接器 APPID", "AskUserQuestion", "自动化任务不得调用", "跳过缺失字段并把影响交给下游阶段说明"]) {
   if (!accountProfileSkillSource.includes(expected)) {
     throw new Error(`Expected account-profile-ops to own profile trigger/read behavior: ${expected}`);
   }
@@ -569,7 +595,8 @@ for (const expected of [
   "账号定位 Gate",
   "content_profile_get",
   "Profile 已有信息足以完成本轮诊断时直接使用",
-  "统一的 Profile 缺失处理规则",
+  "前台对话交给",
+  "自动化任务跳过补充并继续有限诊断",
   "account-profile-ops",
   "user-profile --user-id <accountId>",
   "wechat_published_articles_fetch",
@@ -1271,17 +1298,22 @@ if (bundledAgents.orchestrator.description !== "内容运营总监，负责理�
 if (!bundledAgents.orchestrator.prompt.includes("公众号") || !bundledAgents.orchestrator.prompt.includes("小红书")) {
   throw new Error(`Unexpected orchestrator prompt: ${bundledAgents.orchestrator.prompt}`);
 }
-if (!bundledAgents.orchestrator.prompt.includes("公众号只推送草稿箱时无需用户确认") || !bundledAgents.orchestrator.prompt.includes("除公众号草稿箱推送外")) {
+if (!bundledAgents.orchestrator.prompt.includes("公众号当前只推送草稿箱") || !bundledAgents.orchestrator.prompt.includes("无需该授权")) {
   throw new Error(`Expected orchestrator prompt to preserve the WeChat draft confirmation exception: ${bundledAgents.orchestrator.prompt}`);
 }
-for (const expected of ["必须调用 `AskUserQuestion` 获取结构化确认", "不得只用普通文字回复", "自动化任务场景按 system-reminder 的预授权自动确认并继续执行", "不要因为等待用户确认而中断流程"]) {
+for (const expected of ["必须先获得用户对最终", "发布或互动 Skill 是授权的唯一执行方", "研究、策略和内容生成 Skill", "不得提前请求发布或互动授权"]) {
   if (!bundledAgents.orchestrator.prompt.includes(expected)) {
-    throw new Error(`Expected orchestrator prompt to centralize confirmation rules: ${expected}`);
+    throw new Error(`Expected orchestrator prompt to define business authorization policy: ${expected}`);
   }
 }
-for (const expected of ["自动化预授权只覆盖任务描述、附件或上游产物中已经明确给定的对外内容", "缺少内容或需要", "临场生成/改写评论回复时直接失败"]) {
+for (const expected of ["自动化任务只可执行任务描述、附件或上游产物中已经明确给定并预授权的目标、动作与适用的", "发布、评论或回复缺少最终内容", "需要临场生成、改写对外内容"]) {
   if (!bundledAgents.orchestrator.prompt.includes(expected)) {
     throw new Error(`Expected orchestrator prompt to constrain automation confirmation bypass: ${expected}`);
+  }
+}
+for (const executionDetail of ["AskUserQuestion", "click-publish", "XHS_RISK_", "content_profile_get", "$AGENTSTUDIO_XHS_CLI"]) {
+  if (bundledAgents.orchestrator.prompt.includes(executionDetail)) {
+    throw new Error(`Expected orchestrator prompt to omit execution detail: ${executionDetail}`);
   }
 }
 const bundledSubagents = bundledAgents.orchestrator.subagents || {};
@@ -1738,14 +1770,14 @@ for (const expected of ["image_generate", "image_template_list", "image_template
 }
 const createProfileGateSources = { "xhs-create": xhsCreateSkill, "wechat-create": wechatCreateSkill };
 for (const [skillName, source] of Object.entries(createProfileGateSources)) {
-  for (const expected of ["账号定位 Gate", "content_profile_get", "不得根据账号昵称、用户身份", "统一的 Profile", "缺失处理规则"]) {
+  for (const expected of ["content_profile_get", "不得根据账号昵称、用户身份", "account-profile-ops", "自动化任务跳过补充"]) {
     if (!source.includes(expected)) {
       throw new Error(`Expected ${skillName} to harden account profile gate: ${expected}`);
     }
   }
-  for (const duplicated of ["前台手动对话必须调用", "自动化任务不得调用", "说明缺失及跳过内容"]) {
+  for (const duplicated of ["前台手动对话必须调用", "自动化任务不得调用", "说明缺失及跳过内容", "统一的 Profile 缺失处理规则"]) {
     if (source.includes(duplicated)) {
-      throw new Error(`Expected ${skillName} to defer shared profile handling to the selected-account reminder: ${duplicated}`);
+      throw new Error(`Expected ${skillName} to hand profile writes to account-profile-ops: ${duplicated}`);
     }
   }
 }
@@ -1756,23 +1788,23 @@ const profileReadSkillSources = {
   "content-review-ops": profileReviewSkillSource
 };
 for (const [skillName, source] of Object.entries(profileReadSkillSources)) {
-  for (const expected of ["账号定位 Gate", "content_profile_get", "统一的 Profile", "缺失处理规则", "account-profile-ops"]) {
+  for (const expected of ["账号定位 Gate", "content_profile_get", "account-profile-ops", "自动化任务跳过"]) {
     if (!source.includes(expected)) {
       throw new Error(`Expected ${skillName} to handle missing account profile information: ${expected}`);
     }
   }
-  for (const duplicated of ["前台手动对话必须调用", "自动化任务不得调用", "说明缺失及跳过内容"]) {
+  for (const duplicated of ["前台手动对话必须调用", "自动化任务不得调用", "说明缺失及跳过内容", "统一的 Profile 缺失处理规则"]) {
     if (source.includes(duplicated)) {
-      throw new Error(`Expected ${skillName} to defer shared profile handling to the selected-account reminder: ${duplicated}`);
+      throw new Error(`Expected ${skillName} to hand profile writes to account-profile-ops: ${duplicated}`);
     }
   }
 }
 for (const expected of [
   "不直接调用小红书发布或互动 CLI 命令",
   "生成完整发布包后必须立即交给",
-  "不得只返回发布包后停止",
-  "只生成草稿/只生成发布包/不发布",
-  "发布确认的唯一责任方是 `xhs-publish`",
+  "不得返回发布包后自动停止",
+  "只生成草稿/只生成内容/不发布",
+  "发布前确认是由`xhs-publish`负责",
   "不得调用 `AskUserQuestion`",
   "不得用普通文字询问用户是否确认发布",
   "不得在交接前以 `end_turn` 停止"
@@ -1788,30 +1820,60 @@ const xhsPublishSkill = fs.readFileSync(path.join("resources", "skills", "orches
 if (!xhsPublishSkill.includes("不调用图片生成工具")) {
   throw new Error("Expected xhs-publish to keep image generation out of the publish stage");
 }
-for (const expected of ["AskUserQuestion", "不得只用普通文字回复", "当前是自动化任务运行", "无需用户确认", "填写成功后直接调用 `click-publish`", "不要再次等待浏览器预览确认"]) {
+for (const expected of ["AskUserQuestion", "不得只用普通文字回复", "本轮运行上下文是自动化任务", "明确预授权范围内", "填写成功后直接调用 `click-publish`", "不要再次等待浏览器预览确认"]) {
   if (!xhsPublishSkill.includes(expected)) {
     throw new Error(`Expected xhs-publish to document confirmation protocol: ${expected}`);
   }
 }
-for (const expected of ["发布确认的唯一责任方", "`xhs-create` 不得提前询问确认"]) {
+for (const expected of [
+  "发布授权的唯一执行方",
+  "`xhs-create` 不得提前询问确认",
+  "唯一一次结构化确认",
+  "高风险原因与风险摘要",
+  "合并到这一次最终发布确认",
+  "默认/推荐选项必须是“停止发布”",
+  "不得在最终发布确认前单独调用 `AskUserQuestion`"
+]) {
   if (!xhsPublishSkill.includes(expected)) {
     throw new Error(`Expected xhs-publish to own the single confirmation: ${expected}`);
   }
+}
+if (xhsPublishSkill.includes("若 `risk_level == high` 且本轮是手动对话，调用 `AskUserQuestion` 展示高风险原因")) {
+  throw new Error("Expected high-risk reason to be merged into the final publish confirmation");
 }
 if (xhsPublishSkill.includes("填写后再次调用 `AskUserQuestion` 请求用户确认浏览器预览")) {
   throw new Error("Expected xhs-publish not to require a second preview confirmation after fill-publish");
 }
 const xhsInteractSkill = fs.readFileSync(path.join("resources", "skills", "orchestrator", "xhs-interact", "SKILL.md"), "utf8");
 for (const expected of [
-  "手动对话中，**评论和回复内容必须经过用户确认后才能发送**",
-  "自动化任务中，不调用 `AskUserQuestion`",
-  "已经明确给定且预授权的评论/回复内容",
-  "缺少内容、目标不明确或需要",
-  "临场生成/改写评论回复时，直接失败",
+  "真实互动授权的唯一执行方",
+  "所有评论、回复、点赞、收藏及其取消操作都必须依次执行",
+  "评论或回复额外包含最终文本",
+  "手动对话执行一次结构化确认",
+  "自动化任务不调用 `AskUserQuestion`",
+  "目标与互动类型",
+  "需要临场生成、改写评论回复时直接失败",
+  "结果未知时不得重试",
   "XHS_RISK_MEDIUM_OR_HIGH_BEFORE_INTERACT"
 ]) {
   if (!xhsInteractSkill.includes(expected)) {
     throw new Error(`Expected xhs-interact to document automation interaction confirmation rules: ${expected}`);
+  }
+}
+for (const obsolete of ["你是\"小红书互动助手\"", "完成即止", "手动对话中，**评论和回复内容必须经过用户确认后才能发送**", "失败或风控停止时保留目标和内容，不自动重试真实互动"]) {
+  if (xhsInteractSkill.includes(obsolete)) {
+    throw new Error(`Expected xhs-interact to remove obsolete agent-style or conflicting rule: ${obsolete}`);
+  }
+}
+const xhsExploreSkill = fs.readFileSync(path.join("resources", "skills", "orchestrator", "xhs-explore", "SKILL.md"), "utf8");
+for (const obsolete of ["你是\"小红书内容发现助手\"", "完成即止", "等待用户下一步指令"]) {
+  if (xhsExploreSkill.includes(obsolete)) {
+    throw new Error(`Expected xhs-explore to remain a stage capability instead of an agent persona: ${obsolete}`);
+  }
+}
+for (const xhsSkillSource of [xhsExploreSkill, xhsInteractSkill, xhsPublishSkill]) {
+  if (xhsSkillSource.includes("遵循 system reminder 中的 XHS 前置登录检查规则")) {
+    throw new Error("Expected XHS skills to depend on the runtime guard contract, not reminder serialization");
   }
 }
 
@@ -2113,14 +2175,19 @@ try {
   const expectedPrompt = [
     "<system-reminder>\n当前工作目录（SDK cwd）是：/tmp/workspace\n</system-reminder>",
     `<system-reminder>\n当前时间是：${expectedPromptTime}\n</system-reminder>`,
-    "<system-reminder>\n本轮用户选择了以下内容账号：\n- 平台: xhs；昵称: 小红书 A；accountId: xhs-real-a；小红书号: red-a\n- 平台: wechat；昵称: 公众号 A；accountId: wx-app-a\n\n如果本轮涉及账号运营、选题、创作、发布、互动、复盘或账号诊断，先用对应平台和 accountId 调用 `content_profile_get` 检查账号 Profile。\n- 例外：仅执行发布后 per-run 指标/评论采集，且任务已带 `runId`、`platform`、`accountId` 和内容标识（如 note_id/media_id）时，可以不调用 `content_profile_get`。\n- Profile 已有信息足以完成本轮任务时直接使用。\n- Profile 缺少本轮必要信息时：前台手动对话必须调用 `AskUserQuestion`，且只询问必要字段；自动化任务不得调用 `AskUserQuestion`，跳过缺失信息获取并继续执行，同时在结果或 Run 阶段原因中说明缺失及跳过内容。\n- 不要自行读取或拼接账号数据物理路径。\n</system-reminder>",
+    "<system-reminder>\n本轮用户选择了以下内容账号：\n- 平台: xhs；昵称: 小红书 A；accountId: xhs-real-a；小红书号: red-a\n- 平台: wechat；昵称: 公众号 A；accountId: wx-app-a\n\n以上账号是本轮唯一有效的内容账号上下文；使用对应平台和 accountId 交给相关 Skill 处理。\n不要从昵称推断账号标识，也不要自行读取或拼接账号数据物理路径。\n</system-reminder>",
     "<system-reminder>\n本轮可以使用 GrowthForce 小红书连接器。\n- 小红书连接器使用独立 Electron profile，不要启动外部 Chrome，不要安装或使用 Chrome 扩展 Bridge。\n- 所有小红书操作必须使用环境变量里的 `$AGENTSTUDIO_XHS_CLI` 作为命令前缀，只追加业务子命令和业务参数。\n- 在调用任何 `xhs-*` Skill 或其他小红书业务命令前，必须先运行登录检查命令：`$AGENTSTUDIO_XHS_CLI check-session`；使用 Bash 工具执行时 timeout 设置为 180000ms。\n- 如果 `check-session` 明确返回 `guest=true`，先调用 `xhs_account_mark_needs_refresh(reason=\"not_logged_in\")`，再停止小红书业务命令并提示用户在连接器中重新授权。\n- 如果 `check-session` 返回的 `account_id` 与环境变量 `AGENTSTUDIO_XHS_ACCOUNT_ID` 不一致，先调用 `xhs_account_mark_needs_refresh(reason=\"account_mismatch\", actual_account_id=<返回的 account_id>)`，再停止业务命令。\n- 如果 `check-session` 因 timeout、CDP、连接、页面或 userInfo 读取错误而失败，不要调用状态更新工具，不要继续业务命令；说明检查失败原因。\n</system-reminder>",
     "<system-reminder>\n本轮用户添加了以下本地文件，可在需要时读取：\n- brief.md: /tmp/brief.md\n</system-reminder>",
-    "<system-reminder>\n本轮用户明确选择优先使用以下已启用 Skill：\n- xhs-publish (orchestrator)：发布笔记\n</system-reminder>",
+    "<system-reminder>\n本轮用户选择了以下已启用 Skill 作为优先参考：\n- 任务适用时优先采用；不适用时可以跳过，且不限制调用完成任务所需的其他 Skill。\n- xhs-publish (orchestrator)：发布笔记\n</system-reminder>",
     "用户输入"
   ].join("\n\n");
   if (prompt !== expectedPrompt) {
     throw new Error(`Unexpected composed prompt:\n${prompt}`);
+  }
+  for (const movedProfilePolicy of ["content_profile_get", "Profile 缺少本轮必要信息", "前台手动对话必须调用 `AskUserQuestion`"]) {
+    if (prompt.includes(movedProfilePolicy)) {
+      throw new Error(`Expected selected-account reminder to omit profile SOP: ${movedProfilePolicy}`);
+    }
   }
   for (const forbidden of ["agent-browser", "browser-smoke", "browser-target", "ws://127.0.0.1:9222", "--runtime", "--cdp-port", "--target-id", "--bridge-url", "xhs-profile", "user-data/", "账号定位文件:", "账号定位状态", "账号定位摘要", "缺失字段", "wx-secret-must-not-appear"]) {
     if (prompt.includes(forbidden)) {
@@ -2142,8 +2209,8 @@ try {
       user: { name: "Smoke", avatar: "" }
     }
   }, promptNow);
-  if (promptWithoutAccount.includes("本轮用户选择了以下内容账号") || promptWithoutAccount.includes("本轮可以使用 GrowthForce 小红书连接器") || promptWithoutAccount.includes("要求用户补充账号定位")) {
-    throw new Error(`Expected prompt without selected accounts not to inject account/profile instructions:\n${promptWithoutAccount}`);
+  if (promptWithoutAccount.includes("本轮用户选择了以下内容账号") || promptWithoutAccount.includes("本轮可以使用 GrowthForce 小红书连接器") || promptWithoutAccount.includes("要求用户补充账号定位") || promptWithoutAccount.includes("本轮用户选择了以下已启用 Skill")) {
+    throw new Error(`Expected prompt without selected accounts or skills not to inject account/profile/skill instructions:\n${promptWithoutAccount}`);
   }
   if (promptWithoutAccount.includes("当前是自动化任务运行")) {
     throw new Error(`Expected manual prompt not to inject automation instructions:\n${promptWithoutAccount}`);
@@ -2165,10 +2232,13 @@ try {
     },
     automationRun: { automationTaskId: 12, automationTaskName: "自动发布任务", automationRunId: 34, automationAttemptCount: 2 }
   }, promptNow);
-  for (const expected of ["当前是自动化任务运行", "automationTaskId: 12", "automationTaskName: 自动发布任务", "automationRunId: 34", "automationAttemptCount: 2", "这是同一 run 的第 2 次执行尝试", "所有环节均按任务预授权执行，无需再次请求用户确认", "不要调用 `AskUserQuestion`", "不要只回复“等待用户确认”后停止"]) {
+  for (const expected of ["当前是自动化任务运行", "automationTaskId: 12", "automationTaskName: 自动发布任务", "automationRunId: 34", "automationAttemptCount: 2", "这是同一 run 的第 2 次执行尝试", "本轮预授权仅覆盖任务描述、附件或上游产物中已经明确给定的目标、动作与适用的对外内容", "只能在上述预授权范围内跳过交互确认", "不要调用 `AskUserQuestion`", "不要只回复“等待用户确认”后停止"]) {
     if (!automationPrompt.includes(expected)) {
       throw new Error(`Expected automation prompt to include ${expected}:\n${automationPrompt}`);
     }
+  }
+  if (automationPrompt.includes("所有环节均按任务预授权执行")) {
+    throw new Error(`Expected automation prompt not to claim blanket preauthorization:\n${automationPrompt}`);
   }
   for (const forbidden of ["automation_run_current", "automation_run_get", "automation_run_list", "自动化任务 taskId", "自动化 runId", "当前 attemptCount", "计划触发时间", "最大执行尝试次数"]) {
     if (automationPrompt.includes(forbidden)) {

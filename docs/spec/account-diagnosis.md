@@ -11,16 +11,14 @@
 ## 账号定位 Gate
 
 诊断开始前使用选中账号的稳定 AccountRef 调用 `content_profile_get`。Profile 已有信息足以
-完成本轮诊断时直接使用，不重复询问或确认。Profile 缺失或缺少本轮诊断必要字段时，遵循
-选中账号 system reminder 中统一的缺失处理规则：
+完成本轮诊断时直接使用，不重复询问或确认。Profile 缺失或缺少本轮诊断必要字段时：
 
-- 前台手动对话必须调用 `AskUserQuestion`，且只询问本轮诊断必要字段；
-- 自动化任务不得调用 `AskUserQuestion`，跳过缺失信息获取并继续有限诊断，同时说明缺失
-  字段及受影响的判断；
+- 前台对话交给 `account-profile-ops` 只补充和持久化本轮必要字段；
+- 自动化任务跳过信息补充并继续有限诊断，同时说明缺失字段及受影响的判断；
 - 未选择内容账号时停止诊断并提示用户先选择账号，不要求补充 Profile。
 
-诊断 Skill 保持只读，不直接更新 Profile；需要持久化用户补充的信息时交给
-`account-profile-ops`。
+诊断 Skill 保持只读，不直接更新 Profile。runtime 账号 reminder 只提供本轮已选账号事实，
+不再承载 Profile 读取、补全或确认 SOP。
 
 ## 诊断框架
 

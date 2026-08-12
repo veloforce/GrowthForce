@@ -2,7 +2,7 @@
 
 ##  登录校验
 - 小红书站内搜索、详情和主页使用 `$AGENTSTUDIO_XHS_CLI`。
-- 执行任何小红书业务命令前，遵循 system reminder 中的 XHS 前置登录检查规则。
+- 执行任何小红书业务命令前，遵循本轮 XHS runtime guard 中的前置登录检查规则。
 
 ## 热点或竞品研究
 - 小红书业务命令及参数以 `xhs-explore` 的“CLI 命令签名”为准；详情所需的 `id` 和

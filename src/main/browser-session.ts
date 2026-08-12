@@ -144,12 +144,19 @@ export class BrowserSessionManager {
   }
 
   updateSurface(surface: BrowserSurfaceState): void {
+    const previousSurface = this.surface;
     this.surface = {
       sessionId: surface.sessionId,
       visible: surface.visible,
       bounds: surface.bounds ? normalizeBounds(surface.bounds) : undefined
     };
-    for (const runtime of this.runtimes.values()) this.applySurface(runtime);
+    for (const runtime of this.runtimes.values()) {
+      const wasVisible = previousSurface.visible && previousSurface.sessionId === runtime.sessionId;
+      const isVisible = this.surface.visible && this.surface.sessionId === runtime.sessionId;
+      if (isVisible) this.clearIdleTimer(runtime);
+      else if (wasVisible) this.markIdle(runtime.sessionId);
+      this.applySurface(runtime);
+    }
   }
 
   markIdle(sessionId: number): void {

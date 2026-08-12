@@ -2862,6 +2862,44 @@ button {
   inset: 0;
 }
 
+.browserStatus {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.browserStatus strong {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.browserStatus span {
+  max-width: 360px;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.browserStatusError > svg {
+  color: var(--danger-text);
+}
+
+.browserStatus .secondaryButton {
+  margin-top: 6px;
+}
+
+.browserStatusSpinner {
+  color: var(--brand-accent);
+  animation: spin 900ms linear infinite;
+}
+
 .artifactPreviewPanel {
   min-height: calc(100% - 48px);
   display: flex;
@@ -5180,6 +5218,7 @@ select:disabled {
 .chromeButton:hover,
 .chromeButton.active,
 .iconButton:hover,
+.iconButton.active,
 .miniButton:hover,
 .plainIcon:hover,
 .themeToggleButton:hover,

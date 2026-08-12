@@ -1020,6 +1020,14 @@ function registerIpc(): void {
     return result.filePaths[0];
   });
 
+  ipcMain.handle(ipcChannels.browserSessionEnsure, async (_event, sessionId: number) => {
+    const session = db.getSession(sessionId);
+    if (!session) throw new Error("会话不存在");
+    await browserSessions.ensureSession(session.id);
+    browserSessions.markIdle(session.id);
+    return { ok: true };
+  });
+
   ipcMain.handle(ipcChannels.browserSurfaceUpdate, (_event, surface: BrowserSurfaceState) => {
     browserSessions.updateSurface(surface);
     return { ok: true };

@@ -58,8 +58,10 @@ SDK 嵌入场景没有 Claude CLI 自带的 TUI，所有会中断 agent loop 的
 - `onElicitation` 只用于 MCP server 主动发起的 form/url elicitation，不作为
   `AskUserQuestion` 的实现入口。
 - 自动化任务没有前台用户可交互界面；自动化 Run 禁用 `AskUserQuestion` 并注入
-  system-reminder，要求发布、评论、互动等环节无需用户确认。遇到其他 `canUseTool`
-  等待时默认拒绝，避免后台 Run 无限挂起。
+  system-reminder。发布和真实互动仅在任务描述、附件或上游产物已经明确给定目标、动作与适用的
+  对外内容时视为预授权并跳过交互确认；信息不明确、需要临场生成或改写、缺少硬依赖或安全
+  条件不满足时，停止对应外部动作并说明原因。遇到其他 `canUseTool` 等待时默认拒绝，避免后台
+  Run 无限挂起。
 
 ## Dev-only 模型 HTTP 日志
 

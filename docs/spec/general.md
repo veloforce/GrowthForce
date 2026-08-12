@@ -20,11 +20,21 @@
 
 内容运营能力按三层组织：
 
-- Tool：原子、确定的操作，不承载跨步骤策略、降级或长期数据沉淀。
-- 阶段 Skill：定义单个阶段的 SOP、工具顺序、输入输出、校验、降级和确认规则。
+- Agent：业务抽象层，定义产品能做什么、业务阶段如何衔接以及跨阶段不变量；不包含平台命令、
+  工具参数和阶段异常分支。
+- 阶段 Skill：执行策略层，定义单个阶段的 SOP、工具顺序、输入输出、校验、降级和授权规则。
+- Tool：原子、确定的操作，不承载跨步骤策略、降级、授权决策或长期数据沉淀。
 - Recipe Skill：原由 `content-lifecycle-ops` 承担多阶段编排与长期数据写入。**已解散**：
-  总原则上提 system 层（orchestrator.yml），执行细节下沉各阶段 Skill，长期数据写入收口到
+  业务原则上提 Agent Prompt（orchestrator.yml），执行细节下沉各阶段 Skill，长期数据写入收口到
   单一写者（见 `docs/spec/content-ops-loop.md`）。
+
+授权采用“Agent 声明业务政策、最终副作用 Skill 单点执行”：Agent 说明哪些外部动作需要授权，
+发布或互动 Skill 负责唯一一次具体确认和失败处理，上游研究/生成 Skill 不提前确认。详细职责
+矩阵与阶段 Skill 契约见 `docs/spec/agent-architecture.md`。
+
+Runtime reminder 用于当前目录、时间、自动化运行、已选账号、附件和用户选择 Skill 等动态上下文，
+以及只在该上下文成立时才需要的关键 runtime guard；不承载静态业务流程或阶段 SOP。用户选择
+Skill 表示优先参考，不是强制路由或白名单。
 
 阶段 Skill 之间不建立代码级依赖；通过标准阶段产物交接。用户可以替换某个阶段
 Skill，而不需要替换整个生命周期 Recipe。

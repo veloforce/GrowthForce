@@ -17,9 +17,9 @@ export function composePrompt(request: AgentRunRequest, now = new Date()): strin
       `- automationRunId: ${request.automationRun.automationRunId}`,
       `- automationAttemptCount: ${request.automationRun.automationAttemptCount}`,
       `- automationRunId 属于上述 automationTaskId；${request.automationRun.automationAttemptCount === 1 ? "这是该自动化任务 run 的第一次执行。" : `这是同一 run 的第 ${request.automationRun.automationAttemptCount} 次执行尝试。`}`,
-      "- 所有环节均按任务预授权执行，无需再次请求用户确认。",
+      "- 本轮预授权仅覆盖任务描述、附件或上游产物中已经明确给定的目标、动作与适用的对外内容。",
       "- 不要调用 `AskUserQuestion`，也不要只回复“等待用户确认”后停止。",
-      "- 遇到发布、评论、互动等通常需要确认的步骤时，在自动化上下文中直接按任务描述和已绑定账号继续；如果缺少硬依赖或安全条件不满足，则明确失败并说明原因。"
+      "- 发布、评论、互动等通常需要确认的步骤，只能在上述预授权范围内跳过交互确认；目标、动作或适用的对外内容不明确，需要临场生成或改写，缺少硬依赖或安全条件不满足时，停止对应外部动作并说明原因。"
     ].join("\n")));
   }
 
@@ -46,7 +46,8 @@ export function composePrompt(request: AgentRunRequest, now = new Date()): strin
   }
   if (selectedSkills.length > 0) {
     sections.push(wrapSystemReminder([
-      "本轮用户明确选择优先使用以下已启用 Skill：",
+      "本轮用户选择了以下已启用 Skill 作为优先参考：",
+      "- 任务适用时优先采用；不适用时可以跳过，且不限制调用完成任务所需的其他 Skill。",
       ...selectedSkills.map((skill) => `- ${skill.name}${skill.agent ? ` (${skill.agent})` : ""}${skill.description ? `：${skill.description}` : ""}`)
     ].join("\n")));
   }
@@ -76,11 +77,8 @@ function formatSelectedAccountsReminder(request: AgentRunRequest): string {
     "本轮用户选择了以下内容账号：",
     ...accounts,
     "",
-    "如果本轮涉及账号运营、选题、创作、发布、互动、复盘或账号诊断，先用对应平台和 accountId 调用 `content_profile_get` 检查账号 Profile。",
-    "- 例外：仅执行发布后 per-run 指标/评论采集，且任务已带 `runId`、`platform`、`accountId` 和内容标识（如 note_id/media_id）时，可以不调用 `content_profile_get`。",
-    "- Profile 已有信息足以完成本轮任务时直接使用。",
-    "- Profile 缺少本轮必要信息时：前台手动对话必须调用 `AskUserQuestion`，且只询问必要字段；自动化任务不得调用 `AskUserQuestion`，跳过缺失信息获取并继续执行，同时在结果或 Run 阶段原因中说明缺失及跳过内容。",
-    "- 不要自行读取或拼接账号数据物理路径。"
+    "以上账号是本轮唯一有效的内容账号上下文；使用对应平台和 accountId 交给相关 Skill 处理。",
+    "不要从昵称推断账号标识，也不要自行读取或拼接账号数据物理路径。"
   ].join("\n") : "";
 }
 

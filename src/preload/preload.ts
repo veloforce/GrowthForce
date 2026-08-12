@@ -61,6 +61,7 @@ const api = {
   startXhsLogin: (profileKey?: string) => ipcRenderer.invoke(ipcChannels.xhsLoginStart, profileKey),
   waitXhsLogin: (input?: number | { profileKey?: string; timeout?: number }) => ipcRenderer.invoke(ipcChannels.xhsLoginWait, input),
   logoutXhs: () => ipcRenderer.invoke(ipcChannels.xhsLogout),
+  ensureBrowserSession: (sessionId: number) => ipcRenderer.invoke(ipcChannels.browserSessionEnsure, sessionId),
   updateBrowserSurface: (input: { sessionId?: number; visible: boolean; bounds?: { x: number; y: number; width: number; height: number } }) => ipcRenderer.invoke(ipcChannels.browserSurfaceUpdate, input),
   onAutomationChanged: (callback: () => void) => {
     const listener = () => callback();

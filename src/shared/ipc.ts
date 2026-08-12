@@ -49,6 +49,7 @@ export const ipcChannels = {
   xhsLoginStart: "xhs:login:start",
   xhsLoginWait: "xhs:login:wait",
   xhsLogout: "xhs:logout",
+  browserSessionEnsure: "browser:session:ensure",
   browserSurfaceUpdate: "browser:surface:update",
   agentStartTurn: "agent:startTurn",
   agentCancelTurn: "agent:cancelTurn",

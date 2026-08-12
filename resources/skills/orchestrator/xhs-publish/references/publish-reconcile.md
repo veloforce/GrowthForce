@@ -11,7 +11,7 @@
 
 ## 核对流程
 
-1. 执行回补核对前，遵循 system reminder 中的 XHS 前置登录检查规则；登录检查未通过时停止后续核对。
+1. 执行回补核对前，遵循本轮 XHS runtime guard 中的前置登录检查规则；登录检查未通过时停止后续核对。
 2. 运行 `$AGENTSTUDIO_XHS_CLI user-profile --user-id <accountId>`，只读取本人主页最近笔记。
 3. 对标题做 Unicode NFKC、去首尾空白和连续空白归一化，只接受标题完全一致的候选。
 4. 对候选调用 `get-feed-detail`，使用其 `xsecToken`，确认作者 accountId 一致且发布时间不早于

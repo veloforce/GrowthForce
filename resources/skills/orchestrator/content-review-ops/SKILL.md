@@ -13,6 +13,11 @@ version: 2.0.0
 证据时，才能沉淀长期规律。`playbook.md` 中的「用户明示偏好」区可由创作阶段按用户明确
 要求整段维护；本 Skill 整写证据规律时必须保留该区。
 
+## 职责
+
+- 聚合已发布 Run 的实际证据，解释表现并维护跨 Run 的长期规律与历史窗口。
+- 只写 review、证据规律和 history，不改写发布证据，不执行发布或真实互动。
+
 ## 输入
 
 1. 待复盘的 Run：用 `content_runs_recent` 找出 `publication=completed` 且 `review=pending`
@@ -21,12 +26,16 @@ version: 2.0.0
 2. 长期数据：`content_profile_get`（最高优先级）、`content_playbook_read`、`content_history_read`。
 3. 可选分析证据：用户修改/版本对比用 `content_compare_versions`，历史语料用 `content_analyze_corpus`。
 
+## 输出
+
+- 每个 Run 的事实、解释、建议和阶段状态。
+- 保留用户明示偏好的长期证据规律与滚动 history。
+
 ## 账号定位 Gate
 
 调用 `content_profile_get` 后，Profile 已有信息足以完成本轮任务时直接使用。Profile 缺失或
-缺少本轮复盘必需字段时，遵循选中账号 system reminder 中统一的 Profile 缺失处理规则。
-Profile 缺失不是复盘硬失败；本 Skill 只读 Profile，不直接写入，需要持久化用户补充的信息
-时交给 `account-profile-ops`。
+缺少本轮复盘必需字段时，前台对话可交给 `account-profile-ops` 补充必要信息；自动化任务跳过
+补充并说明受影响的判断。Profile 缺失不是复盘硬失败；本 Skill 只读 Profile。
 
 > **对 Run 证据文件只读**：本 Skill 对 Run 下的证据文件（`draft`/`final`/`metrics`/
 > `engagement`/`publish`）一律只读，绝不改写。本 Skill 在 Run 内能写的只有自己的 `review`
@@ -104,3 +113,13 @@ total_runs: 47
 - 对 Run 下的证据文件只读；在 Run 内只写自己的 `review` 文档与 `review` 阶段状态。
 - 本 Skill 是证据规律区与 `history.md` 的唯一写者；不执行发布、互动或内容生成。
 - 指标抓取与互动执行由 `content-collect-ops` 在 per-run 采集任务中完成，本 Skill 只消费其结果。
+
+## 授权
+
+本 Skill 只分析和沉淀已有证据，不产生平台外部副作用，无需发布或互动授权。
+
+## 失败与交接
+
+- 没有实际指标或用户反馈证据时不沉淀长期规律，并明确证据不足。
+- 单个 Run 失败不应污染其他 Run；保留失败原因后继续处理可复盘项。
+- 输出的有效策略约束供后续研究、策略和创作阶段只读消费。

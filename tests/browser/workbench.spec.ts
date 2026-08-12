@@ -45,15 +45,9 @@ test("renderer workbench shows Electron-only notice in a browser", async ({ page
   await expect(page.getByPlaceholder("尽管问")).toBeVisible();
   await expect(page.getByRole("button", { name: "设置", exact: true })).toHaveCount(0);
   await expect(page.locator(".topActions").getByTitle("新会话")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "打开右侧面板" })).toBeVisible();
-
-  await page.getByRole("button", { name: "打开右侧面板" }).click();
-  await expect(page.locator(".rightPanel.open")).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "打开右侧面板" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "隐藏右侧面板" })).toBeVisible();
-  await page.getByRole("button", { name: "隐藏右侧面板" }).click();
+  await expect(page.getByRole("button", { name: "开始对话后可打开内置浏览器" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "开始对话后可打开内置浏览器" })).toBeDisabled();
   await expect(page.locator(".rightPanel.open")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "打开右侧面板" })).toBeVisible();
 
   await expect(page.getByText("当前页面未运行在 Electron 环境，无法连接桌面端能力。")).toBeVisible();
 
@@ -894,6 +888,7 @@ test("renderer keeps browser surface offscreen until user opens right panel", as
       startXhsLogin: async () => null,
       waitXhsLogin: async () => null,
       logoutXhs: async () => null,
+      ensureBrowserSession: async () => ({ ok: true }),
       updateBrowserSurface: async (input: unknown) => {
         surfaceCalls.push(input);
         return { ok: true };
@@ -921,7 +916,7 @@ test("renderer keeps browser surface offscreen until user opens right panel", as
     return calls.some((call) => call.visible === true);
   })).toBe(false);
 
-  await page.getByRole("button", { name: "打开右侧面板" }).click();
+  await page.getByRole("button", { name: "打开内置浏览器" }).click();
 
   await expect(page.locator(".rightPanel.open")).toHaveCount(1);
   await page.waitForTimeout(250);
@@ -952,7 +947,7 @@ test("renderer keeps browser surface offscreen until user opens right panel", as
   expect(visibleBounds?.width).toBeLessThanOrEqual(640);
   expect(visibleBounds?.height).toBeGreaterThan(200);
 
-  await page.getByRole("button", { name: "隐藏右侧面板" }).click();
+  await page.getByRole("button", { name: "折叠内置浏览器" }).click();
   await expect.poll(() => page.evaluate(() => {
     const calls = (window as Window & { __surfaceCalls?: Array<{ sessionId?: number; visible?: boolean }> }).__surfaceCalls ?? [];
     return calls.at(-1);

@@ -11,6 +11,11 @@ version: 1.0.0
 
 本 Skill 输出 Markdown 和视觉素材，不负责排版、推送草稿箱或长期复盘。
 
+## 职责
+
+- 生成符合公众号与账号定位的 Markdown、标题摘要和视觉素材，并形成可交接的内容产物。
+- 不负责 HTML 排版、草稿箱推送、发布后采集或长期复盘。
+
 ## 输入
 
 - 用户目标或 Content Brief。
@@ -19,13 +24,13 @@ version: 1.0.0
 
 ## 账号定位 Gate
 
-如果 system reminder 提供了已选内容账号，本 Skill 在生成前必须使用该账号的 AccountRef
+如果本轮账号上下文提供了已选内容账号，本 Skill 在生成前必须使用该账号的 AccountRef
 调用 `content_profile_get` 检查 Profile。Profile 是账号级事实，不得根据账号昵称、用户身份、
 本轮主题或历史对话自行推断定位后继续创作。
 
 - Profile 已存在且足以完成本轮任务时，按 Profile 约束生成。
-- Profile 缺失或缺少本轮目标必需字段时，遵循选中账号 system reminder 中统一的 Profile
-  缺失处理规则。
+- Profile 缺失或缺少本轮目标必需字段时，前台对话交给 `account-profile-ops` 只补充必要信息；
+  自动化任务跳过补充并说明缺失对本次创作的影响。
 - 用户明确提出可长期复用的创作偏好、结构要求、风格要求、禁区或 CTA 习惯时，先用
   `content_playbook_preferences_read` 读取「用户明示偏好」区，再用
   `content_playbook_preferences_replace` 整段替换该区。不得写入表现判断或数据规律。
@@ -51,6 +56,15 @@ version: 1.0.0
      Markdown 输出。
 5. 将最终 Markdown、主题 YAML 和素材路径返回给 `wechat-markdown-to-html`。
 
+## 输出
+
+- 最终 Markdown、标题、摘要、标签、视觉素材路径和可选 runId。
+- 用户目标包含排版或草稿箱推送时，连同账号约束交给 `wechat-markdown-to-html`。
+
+## 授权
+
+本 Skill 不产生平台外部副作用，无需发布授权；不得提前询问用户是否推送草稿箱或正式发布。
+
 ## Run 记录与初稿快照
 
 Run 是完整运营任务的记录层，由本 Skill 作为生产起点创建并持有 runId：
@@ -68,3 +82,9 @@ Run 是完整运营任务的记录层，由本 Skill 作为生产起点创建并
 - 本 Skill 只创建本次 Run 并写 `draft` 快照；不创建发布后采集任务，不写 History、证据规律、
   metrics 或 review。
 - 不调用微信 API，不声称已排版或推送草稿箱。
+
+## 失败与交接
+
+- 证据或 Profile 不完整时明确标记，不编造素材与账号事实。
+- Markdown 可生成但图片失败时保留 Markdown 和提示词，并报告视觉缺口。
+- 用户要求继续推送时先交给排版 Skill；只要内容时以 Markdown 产物结束。

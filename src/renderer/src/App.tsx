@@ -19,6 +19,7 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  Globe2,
   Home,
   Maximize2,
   Minimize2,
@@ -27,7 +28,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
-  PanelRightOpen,
   Paperclip,
   PackageOpen,
   Pencil,
@@ -314,6 +314,8 @@ export function App() {
   const [artifactPreviewLoading, setArtifactPreviewLoading] = useState(false);
   const [artifactPreviewLoadingPath, setArtifactPreviewLoadingPath] = useState<string | null>(null);
   const [artifactPreviewError, setArtifactPreviewError] = useState("");
+  const [browserPanelLoading, setBrowserPanelLoading] = useState(false);
+  const [browserPanelError, setBrowserPanelError] = useState("");
   const [emptyQuickPrompts, setEmptyQuickPrompts] = useState<WorkbenchQuickPrompt[]>(fallbackWorkbenchPrompts.quickPrompts.slice(0, 4));
   const [typedPrompt, setTypedPrompt] = useState("");
   const [typingIndex, setTypingIndex] = useState(0);
@@ -332,6 +334,7 @@ export function App() {
   const automationChangedRefreshTimerRef = useRef<number | undefined>(undefined);
   const mockThinkingDelayTimerRef = useRef<number | undefined>(undefined);
   const mockThinkingRotateTimerRef = useRef<number | undefined>(undefined);
+  const browserEnsureRunRef = useRef(0);
 
   const activeRequestId = activeSessionId ? runningRequests[activeSessionId] : undefined;
   const activeSessionIsRunning = activeSession?.status === "running";
@@ -351,6 +354,14 @@ export function App() {
   const activeModelName = bootstrap?.config.provider.model || providerDraft.model || "";
   const hasModelChoices = activeProviderModels.length > 0;
   const isEmptyWorkbench = activeView === "workbench" && displayMessages.length === 0;
+  const browserPanelActive = activeView === "workbench" && rightOpen && rightPanelMode === "browser";
+  const browserButtonLabel = !activeSessionId
+    ? "开始对话后可打开内置浏览器"
+    : browserPanelLoading
+      ? "正在打开内置浏览器"
+      : browserPanelActive
+        ? "折叠内置浏览器"
+        : "打开内置浏览器";
   const hasFloatingLayer = Boolean(activeComposerPopover) || installDialogOpen || automationDialogOpen || settingsDialogOpen || wechatDialogOpen || Boolean(automationDeleteTask);
   const visibleSkills = skillTab === "market" ? marketSkills : installedSkills;
   const filteredSkills = useMemo(() => {
@@ -576,7 +587,7 @@ export function App() {
       frame = window.requestAnimationFrame(() => {
         frame = 0;
         const element = browserSurfaceRef.current;
-        const visible = Boolean(rightOpen && rightPanelMode === "browser" && activeView === "workbench" && activeSessionId && element);
+        const visible = Boolean(rightOpen && rightPanelMode === "browser" && activeView === "workbench" && activeSessionId && !browserPanelLoading && !browserPanelError && element);
         if (!visible) {
           void window.agentStudio.updateBrowserSurface({ sessionId: activeSessionId, visible: false });
           return;
@@ -609,7 +620,7 @@ export function App() {
       window.removeEventListener("resize", updateSurface);
       void window.agentStudio.updateBrowserSurface({ sessionId: activeSessionId, visible: false });
     };
-  }, [activeSessionId, activeView, collapsed, rightMaximized, rightOpen, rightPanelMode, rightPanelWidth]);
+  }, [activeSessionId, activeView, browserPanelError, browserPanelLoading, collapsed, rightMaximized, rightOpen, rightPanelMode, rightPanelWidth]);
 
   useEffect(() => {
     if (!window.agentStudio) return;
@@ -1028,6 +1039,7 @@ export function App() {
     setRightOpen(false);
     setRightPanelMode("browser");
     resetArtifactPreview();
+    resetBrowserPanelState();
     nearBottomRef.current = true;
     setShowScrollDown(false);
     activeSessionIdRef.current = undefined;
@@ -1281,6 +1293,7 @@ export function App() {
     setRightOpen(false);
     setRightPanelMode("browser");
     resetArtifactPreview();
+    resetBrowserPanelState();
     nearBottomRef.current = true;
     setShowScrollDown(false);
     activeSessionIdRef.current = detail.session.id;
@@ -1403,6 +1416,7 @@ export function App() {
 
   async function openArtifactPreview(file: ArtifactFileCard) {
     if (!window.agentStudio || !activeSessionId) return;
+    resetBrowserPanelState();
     setRightPanelMode("artifact");
     setRightOpen(true);
     setArtifactPreviewLoading(true);
@@ -1434,15 +1448,45 @@ export function App() {
     setArtifactPreviewError("");
   }
 
-  function openBrowserPanel() {
+  function resetBrowserPanelState() {
+    browserEnsureRunRef.current += 1;
+    setBrowserPanelLoading(false);
+    setBrowserPanelError("");
+  }
+
+  function toggleBrowserPanel() {
+    if (!activeSessionId || browserPanelLoading) return;
+    if (activeView === "workbench" && rightOpen && rightPanelMode === "browser") {
+      closeRightPanel();
+      return;
+    }
+    void showBrowserPanel();
+  }
+
+  async function showBrowserPanel() {
+    if (!window.agentStudio || !activeSessionId) return;
+    const sessionId = activeSessionId;
+    const runId = browserEnsureRunRef.current + 1;
+    browserEnsureRunRef.current = runId;
     setActiveView("workbench");
     setRightPanelMode("browser");
     resetArtifactPreview();
     setRightOpen(true);
+    setBrowserPanelLoading(true);
+    setBrowserPanelError("");
+    try {
+      await window.agentStudio.ensureBrowserSession(sessionId);
+    } catch (err) {
+      if (browserEnsureRunRef.current !== runId) return;
+      setBrowserPanelError(err instanceof Error ? err.message : String(err));
+    } finally {
+      if (browserEnsureRunRef.current === runId) setBrowserPanelLoading(false);
+    }
   }
 
   function closeRightPanel() {
     resetArtifactPreview();
+    resetBrowserPanelState();
     setRightOpen(false);
     setRightPanelMode("browser");
   }
@@ -2097,11 +2141,16 @@ export function App() {
             >
               <ThemeModeIcon mode={themeState.themeMode} size={17} />
             </button>
-            {!rightOpen && (
-              <button className="iconButton" onClick={openBrowserPanel} title="打开右侧面板" aria-label="打开右侧面板">
-                <PanelRightOpen size={19} />
-              </button>
-            )}
+            <button
+              className={`iconButton browserToggleButton ${browserPanelActive ? "active" : ""}`}
+              onClick={toggleBrowserPanel}
+              title={browserButtonLabel}
+              aria-label={browserButtonLabel}
+              aria-pressed={browserPanelActive}
+              disabled={!activeSessionId || browserPanelLoading}
+            >
+              <Globe2 size={18} />
+            </button>
           </div>
         </header>
 
@@ -2213,7 +2262,7 @@ export function App() {
               <button className={`chromeButton ${rightMaximized ? "active" : ""}`} onClick={() => setRightMaximized((value) => !value)} title={rightMaximized ? "还原右侧面板" : "最大化右侧面板"} aria-label={rightMaximized ? "还原右侧面板" : "最大化右侧面板"}>
                 {rightMaximized ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
               </button>
-              <button className="chromeButton active" onClick={closeRightPanel} title="隐藏右侧面板" aria-label="隐藏右侧面板">
+              <button className="chromeButton active" onClick={closeRightPanel} title="折叠右侧面板" aria-label="折叠右侧面板">
                 <PanelRightClose size={18} />
               </button>
             </header>
@@ -2255,7 +2304,22 @@ export function App() {
                 <div className="rightEmpty">{artifactPreviewLoading ? "正在加载文件..." : "选择文件后显示预览"}</div>
               ) : (
                 <div className="browserSurface" ref={browserSurfaceRef}>
-                  {!activeSessionId && <div className="rightEmpty">选择或创建会话后显示浏览器</div>}
+                  {browserPanelLoading ? (
+                    <div className="browserStatus" role="status">
+                      <RefreshCw className="browserStatusSpinner" size={20} />
+                      <strong>正在打开内置浏览器</strong>
+                      <span>正在准备当前会话的浏览器环境…</span>
+                    </div>
+                  ) : browserPanelError ? (
+                    <div className="browserStatus browserStatusError" role="alert">
+                      <AlertCircle size={20} />
+                      <strong>无法打开内置浏览器</strong>
+                      <span>{browserPanelError}</span>
+                      <button className="secondaryButton" onClick={() => void showBrowserPanel()}>重试</button>
+                    </div>
+                  ) : !activeSessionId ? (
+                    <div className="rightEmpty">开始对话后可打开内置浏览器</div>
+                  ) : null}
                 </div>
               )
             )}
